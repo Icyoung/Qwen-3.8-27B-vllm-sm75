@@ -10,6 +10,8 @@ from pathlib import Path
 
 import vllm
 
+from patch_request_usage import patch_package as patch_request_usage
+
 
 def main() -> None:
     parser = argparse.ArgumentParser()
@@ -26,6 +28,7 @@ def main() -> None:
 
     source_root = args.overlay.resolve()
     package_root = Path(vllm.__file__).resolve().parent
+    patch_request_usage(package_root)
     files = [
         "config/model.py",
         "device_allocator/disk_snapshot.py",
@@ -34,6 +37,7 @@ def main() -> None:
         "engine/arg_utils.py",
         "entrypoints/serve/utils/api_utils.py",
         "entrypoints/serve/instrumentator/metrics.py",
+        "entrypoints/serve/instrumentator/request_timing.py",
         "entrypoints/serve/instrumentator/monitor.py",
         "entrypoints/serve/instrumentator/dashboard.html",
         "envs_sm75.py",

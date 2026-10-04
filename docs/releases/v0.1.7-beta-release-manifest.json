@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "release": "0.1.7-beta",
+  "status": "prerelease",
+  "publicationDate": "2026-10-05",
+  "publicBaselineCommit": "ecee5c70ee4e8cbd915edc49340d07fa5f5545ad",
+  "upstream": {
+    "version": "0.30.0",
+    "commit": "ced6857afa0ea7b2e3f0846a62e1394e90f15607",
+    "image": "vllm/vllm-openai:v0.30.0-cu129@sha256:58fdb6bb123a81aa53f46fa4652ad8cc87e817bd1077c9832c6258ef12c1c688",
+    "platform": "linux/amd64"
+  },
+  "localFormalImage": "vllm-sm75:v0.1.7-ultra-beta",
+  "testedImageId": "sha256:1e38339298f551b4d363251a9d51fc1fb2aac01f7fc9544c47006aeabb7b644d",
+  "testedSourceArchiveSha256": "2de260adb7ddb28729cfa9dd2c682519d9fed1dcaac5be789c433d501e03f8cc",
+  "publication": {
+    "repository": "https://github.com/fishensw/VLLM-SM75",
+    "tag": "v0.1.7-beta",
+    "releaseUrl": "https://github.com/fishensw/VLLM-SM75/releases/tag/v0.1.7-beta",
+    "scope": "source-code-and-version-documentation",
+    "containerImagesPublished": false,
+    "mainBranchChanged": false,
+    "topLevelReadmesChanged": false
+  },
+  "validation": {
+    "nextFinalGpuDate": "2026-10-04",
+    "nextGpu": "TP8 QSA FP8-KV; true no-MTP and MTP3; 256K single plus four mixed requests; retrieval and tool calling passed",
+    "nextPerformance": "../flash-next-performance.md",
+    "integrationAnd27b": "../validation/v0.1.7-unified.md",
+    "consoleTests": 289,
+    "runtimeTests": 90,
+    "requestTimingTests": 12,
+    "publicationRuntimeChanges": false,
+    "publicationGpuRerun": false,
+    "buildRoute": "audited Ultra dependency layers plus complete runtime/console source overlay; tested image built 2026-10-04",
+    "fullOfficialBaseBuildRerunForBeta": false
+  },
+  "documentation": {
+    "release": "v0.1.7-beta.md",
+    "configurationTemplates": "../configuration-v0.1.7.md",
+    "nextBuildAndStartup": "../flash-next-tp8.md",
+    "fullBuild": "../../docker/BUILD.md"
+  }
+}

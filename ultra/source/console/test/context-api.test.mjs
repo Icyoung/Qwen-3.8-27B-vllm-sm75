@@ -29,6 +29,13 @@ test('context model metadata, save/reload and executable argv preserve YaRN and 
     }
     assert(ready, 'manager must start');
     const headers = {Authorization: 'Bearer ' + fs.readFileSync(path.join(root, 'key'), 'utf8').trim(), 'Content-Type': 'application/json'};
+    const beforeDraft = await (await fetch(base+'/console-api/profiles',{headers})).json();
+    const registeredDraft = await (await fetch(base+'/console-api/models/register',{method:'POST',headers,body:JSON.stringify({path:model})})).json();
+    const draftResponse=await fetch(base+'/console-api/models/draft',{method:'POST',headers,body:JSON.stringify({model:registeredDraft.id,template:'custom'})});
+    assert.equal(draftResponse.status,200,await draftResponse.clone().text());
+    const draft=(await draftResponse.json()).profile;
+    assert.equal(draft.args[0],model);assert.equal(draft.format,'fp16');
+    assert.deepEqual(await (await fetch(base+'/console-api/profiles',{headers})).json(),beforeDraft,'draft preview must not save or change existing configurations');
     const metadata = modelContext(config);
     const originalArgs = [model, '--tensor-parallel-size', '4', '--seed', '42', '--hf-overrides', '{"architectures":["Synthetic"],"text_config":{"custom_field":17}}'];
     const values = {...oneMillionContext(readContextSettings(originalArgs, metadata), metadata), gpuKvGiB: '2.5', cpuKvMode: 'native', cpuKvGiB: '16.5'};
@@ -66,7 +73,7 @@ test('context model metadata, save/reload and executable argv preserve YaRN and 
     const switched = (await (await fetch(base + '/console-api/profiles', {headers})).json()).find(row => row.id === switchedId);
     assert.equal(switched.args[0], otherModel);
     assert.equal(argValue(switched.args, '--max-model-len'), '32768');
-    assert.equal(JSON.parse(argValue(switched.args, '--hf-overrides')).text_config.rope_parameters, undefined);
+    assert.equal(argValue(switched.args, '--hf-overrides'), null, 'cross-model drafts must not inherit the previous architecture or rotary overrides');
     assert.equal(argValue(switched.args, '--kv-cache-memory-bytes'), String(2.5 * 2 ** 30));
 
     const bad = {...input, args: [...args, '--kv-offloading-size=32']};

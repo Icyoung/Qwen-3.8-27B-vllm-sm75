@@ -38,7 +38,8 @@ test("header uses recent cache deltas, maximum temperature and complete total po
   assert.equal(data.memory, 50);
   assert.equal(data.gpus[1].memory, 37.5);
   assert.equal(data.kv, 37);
-  assert.equal(data.decode, 24);
+  assert.equal(data.decode, null);
+  assert.equal(data.windowDecode, 24);
 });
 test("stale, failed or missing engine samples never appear live; hardware stays independent", () => {
   for (const rows of [[], [point(now - 16000, 0, 0)]]) {
@@ -74,4 +75,32 @@ test("partial GPU readings do not masquerade as total power or maximum temperatu
   assert.equal(data.temperature, null);
   assert.equal(data.utilization, null);
   assert.equal(data.memory, null);
+});
+
+
+test("request rates use exact usage timing gauges, never engine-window counters", () => {
+  const sample = point(now, 10, 20);
+  Object.assign(sample.m, metrics.parsePrometheus(`
+vllm:sm75_request_prefill_tokens_per_second 512
+vllm:sm75_request_decode_tokens_per_second 30
+vllm:sm75_request_timing_updated_seconds ${now / 1000}
+vllm:sm75_request_timing_active 0
+  `));
+  const data = liveSummary([sample], hw, {now});
+  assert.equal(data.prefill, 512);
+  assert.equal(data.decode, 30);
+  assert.equal(data.windowPrefill, 120);
+  assert.equal(data.requestTiming.contract, 'llm-speedtest-client-v1');
+  assert.equal(data.requestTiming.active, false);
+  sample.m['vllm:sm75_request_timing_updated_seconds'][0].value -= 16;
+  assert.equal(liveSummary([sample], hw, {now}).decode, null);
+});
+
+test("missing, invalid or multiple request metric series do not become estimated speed", () => {
+  for (const values of [[{value:NaN}], [{value:-1}], [{value:10},{value:20}]]) {
+    const sample = point(now, 10, 20);
+    sample.m['vllm:sm75_request_timing_updated_seconds'] = [{value:now / 1000}];
+    sample.m['vllm:sm75_request_decode_tokens_per_second'] = values;
+    assert.equal(liveSummary([sample], hw, {now}).decode, null);
+  }
 });

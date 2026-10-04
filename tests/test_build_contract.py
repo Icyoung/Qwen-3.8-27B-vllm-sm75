@@ -18,13 +18,58 @@ class BuildContract(unittest.TestCase):
         self.assertNotIn('git init', script)
         self.assertNotIn('prepare_upstream', script)
 
-    def test_official_entrypoint_inheritance(self):
+    def test_profile_entrypoint_preserves_upstream_cli(self):
         for name in ('Dockerfile', 'Dockerfile.fast'):
             text = (ROOT / 'docker' / name).read_text(encoding='utf-8')
-            self.assertIsNone(re.search(r'^(ENTRYPOINT|CMD)\s', text, re.M))
+            self.assertIn('ENTRYPOINT ["python3", "/opt/vllm-sm75/runtime-entrypoint.py"]',text)
         installer = (ROOT / 'docker/helpers/install_sm75_overlay.py').read_text(encoding='utf-8')
         for path in ('entrypoints/cli/main.py', 'entrypoints/cli/serve.py', 'entrypoints/serve/entry.py'):
             self.assertNotIn('"' + path + '"', installer)
+
+    def test_raw_arguments_delegate_without_loss_and_ultra_persists_in_data(self):
+        from unittest.mock import patch
+        module=runpy.run_path(str(ROOT/'docker/helpers/runtime-entrypoint.py'))
+        raw=['/models/a model','--speculative-config','{"method":"mtp","num_speculative_tokens":5}','--max-num-seqs','4']
+        self.assertEqual(module['resolve'](raw,{})['args'],raw)
+        with patch.dict('os.environ',{},clear=True),patch('sys.argv',['entry',*raw]),patch('os.execvpe',side_effect=SystemExit) as execute:
+            with self.assertRaises(SystemExit):module['main']()
+            self.assertEqual(execute.call_args.args[1],['vllm','serve',*raw])
+        with patch.dict('os.environ',{'SM75_EDITION':'ultra'},clear=True),patch('sys.argv',['entry']),patch('os.execvpe',side_effect=SystemExit) as execute:
+            with self.assertRaises(SystemExit):module['main']()
+            self.assertEqual(execute.call_args.args[0],'/usr/local/bin/node')
+            self.assertEqual(execute.call_args.args[2]['SM75_CONSOLE_ROOT'],'/data')
+
+    def test_ultra_full_docker_arguments_keep_port_tp_and_secret_out_of_profile(self):
+        import json
+        from unittest.mock import patch
+        module=runpy.run_path(str(ROOT/'docker/helpers/runtime-entrypoint.py'))
+        argv=['entry','/models/target','--port=8123','--tensor-parallel-size','8','--max-num-seqs','4']
+        with patch.dict('os.environ',{'SM75_EDITION':'ultra','VLLM_API_KEY':'fixture-only-key'},clear=True),patch('sys.argv',argv),patch('os.execvpe',side_effect=SystemExit) as execute:
+            with self.assertRaises(SystemExit):module['main']()
+            env=execute.call_args.args[2];profile=json.loads(env['SM75_LAUNCH_PROFILE'])
+            self.assertEqual(profile['port'],8123);self.assertEqual(profile['args'],argv[1:])
+            self.assertEqual(profile['power']['gpus'],'0,1,2,3,4,5,6,7')
+            self.assertNotIn('fixture-only-key',env['SM75_LAUNCH_PROFILE'])
+
+    def test_explicit_cli_and_kernel_overrides_replace_template_defaults(self):
+        module=runpy.run_path(str(ROOT/'docker/helpers/runtime-entrypoint.py'))
+        p=module['resolve'](['--profile','flash-next-tp8-256k-mtp3','--max-model-len','65536','--no-enable-prefix-caching'],{'VLLM_SM75_QWEN38_HC_GEMV':'0'})
+        self.assertEqual(p['args'].count('--max-model-len'),1)
+        self.assertEqual(p['args'][p['args'].index('--max-model-len')+1],'65536')
+        self.assertNotIn('--enable-prefix-caching',p['args'])
+        self.assertEqual(p['env']['VLLM_SM75_QWEN38_HC_GEMV'],'0')
+
+    def test_template_engine_defaults_do_not_leak_into_ultra_manager(self):
+        import json
+        from unittest.mock import patch
+        module=runpy.run_path(str(ROOT/'docker/helpers/runtime-entrypoint.py'))
+        with patch.dict('os.environ',{'SM75_EDITION':'ultra'},clear=True),patch('sys.argv',['entry','--profile','flash-next-tp8-256k-mtp3']),patch('os.execvpe',side_effect=SystemExit) as execute:
+            with self.assertRaises(SystemExit):module['main']()
+            env=execute.call_args.args[2];p=json.loads(env['SM75_LAUNCH_PROFILE'])
+            self.assertNotIn('HF_HUB_OFFLINE',env)
+            self.assertNotIn('VLLM_SM75_QSA_FP8_MAIN_KV',env)
+            self.assertEqual(p['env']['HF_HUB_OFFLINE'],'1')
+            self.assertEqual(p['env']['VLLM_SM75_QSA_FP8_MAIN_KV'],'1')
 
     def test_installer(self):
         install = runpy.run_path(str(ROOT / 'docker/helpers/install_speculative.py'))['install']

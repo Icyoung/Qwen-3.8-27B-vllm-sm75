@@ -29,6 +29,7 @@ export function writeHarnessFile(file, text) {
 export class Standalone {
   constructor(root, key, options = {}) {
     this.preflightLMCache = options.preflight || preflightLMCache;
+    this.onEngineChange = options.onEngineChange || (() => {});
     this.root = root;
     this.key = key;
     this.engine = null;
@@ -43,6 +44,7 @@ export class Standalone {
     return {
       running: !!this.engine && this.engine.id === p.id,
       name: p.id,
+      phase: this.engine?.id === p.id ? this.engine.phase || 'starting' : 'stopped',
       backend: "in-container",
     };
   }
@@ -54,6 +56,7 @@ export class Standalone {
     }
   }
   engineKey() {
+    if (this.engine?.apiKey) return this.engine.apiKey;
     try {
       const k = JSON.parse(
         fs.readFileSync(path.join(this.root, "api-access.json"), "utf8"),
@@ -194,6 +197,7 @@ export class Standalone {
       }
       if (this.closing) throw Error("管理服务正在关闭");
       if (cacheFailed) throw Error("LMCache 服务在模型启动前退出");
+      const apiKey = this.engineKey();
       const child = await this.launch(
         "vllm",
         ["serve", ...args],
@@ -205,7 +209,7 @@ export class Standalone {
           ...containerCache,
           FLASHINFER_WORKSPACE_BASE:
             preparedCache?.FLASHINFER_WORKSPACE_BASE || "/root",
-          VLLM_API_KEY: this.engineKey(),
+          VLLM_API_KEY: apiKey,
           VLLM_MONITOR: p.env?.VLLM_MONITOR ?? "0",
         },
         path.join(this.root, p.id + ".log"),
@@ -215,13 +219,17 @@ export class Standalone {
         await this.terminate(child);
         throw Error("LMCache 服务在模型启动期间退出，已停止本次模型进程");
       }
-      this.engine = { id: p.id, child };
+      this.engine = { id: p.id, child, phase:'starting', apiKey };
+      this.onEngineChange();
       child.once("exit", async () => {
         if (cacheRuntime) {
           this.cacheCleanup = this.lmcache.stop(cacheRuntime.child);
           this.cacheCleanup.catch(() => {});
         }
-        if (this.engine?.child === child) this.engine = null;
+        if (this.engine?.child === child) {
+          this.engine = null;
+          this.onEngineChange();
+        }
         if (this.supervisor) {
           const s = this.supervisor;
           this.supervisor = null;
@@ -292,11 +300,13 @@ export class Standalone {
   }
   async startHarness(p) {
     if (this.harness) {
-      if (this.harness.id !== p.id) throw Error("请先停止工作区再切换模型");
+      if (this.harness.id !== p.id && this.engine?.phase === 'ready') await this.updateHarnessModel(p);
       return;
     }
     const home = "/dsh/home",
       work = "/dsh/workspace";
+    fs.mkdirSync("/dsh", {recursive:true,mode:0o755});
+    fs.chmodSync("/dsh",0o755);
     for (const dir of [home, work]) {
       fs.mkdirSync(dir, { recursive: true });
       fs.chownSync(dir, 1000, 1000);
@@ -327,13 +337,32 @@ export class Standalone {
       HOME: work,
       DSH_TELEMETRY_DISABLED: "1",
       SM75_ENGINE_KEY: this.engineKey(),
+      SM75_WORKBENCH_CONTROL_KEY: randomUUID(),
       CUDA_VISIBLE_DEVICES: "",
     };
     const child = await this.launchHarness(dshArgs, dshEnv, work);
-    this.harness = { id: p.id, child };
+    this.harness = { id: p.id, child, controlKey:dshEnv.SM75_WORKBENCH_CONTROL_KEY };
     child.once("exit", () => {
       if (this.harness?.child === child) this.harness = null;
     });
+  }
+  async harnessRequest(route, body) {
+    const response = await fetch('http://127.0.0.1:'+(process.env.SM75_HARNESS_PORT || '3085')+route, {
+      method:body === undefined ? 'GET' : 'POST',
+      headers:{Authorization:'Bearer '+this.harness?.controlKey,'Content-Type':'application/json'},
+      ...(body === undefined ? {} : {body:JSON.stringify(body)}), signal:AbortSignal.timeout(15000)});
+    if (!response.ok) throw Error('工作台模型连接更新失败，请保留会话并重试');
+    return response.json();
+  }
+  async assertHarnessIdle() {
+    const state = await this.harnessRequest('/sm75/activity');
+    if (state.busy) throw Error('工作台仍有任务运行，请等待或停止任务后切换模型');
+  }
+  async updateHarnessModel(p) {
+    if (!this.harness) return;
+    const config = managedHarnessConfig(p);
+    await this.harnessRequest('/sm75/model',{...config,engineKey:this.engineKey()});
+    this.harness.id = p.id;
   }
   async launchHarness(args, env, cwd) {
     // DSH can execute user tools. Never fall back to the manager's root identity.

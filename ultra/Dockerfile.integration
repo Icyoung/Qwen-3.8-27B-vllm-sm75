@@ -1,0 +1,29 @@
+# The application layer comes from the reviewed source; only pinned Node and
+# Harness dependencies are reused from the audited Ultra dependency image.
+ARG HARNESS_IMAGE=vllm-sm75:v0.1.7-ultra-beta
+ARG VLLM_IMAGE=vllm-sm75:v0.1.7-ultra-beta
+FROM ${HARNESS_IMAGE} AS harness
+FROM ${VLLM_IMAGE}
+ARG SOURCE_SHA256
+COPY --from=harness /usr/local/bin/node /usr/local/bin/node
+COPY --from=harness /opt/harness/node_modules /opt/harness/node_modules
+RUN ln -sf /opt/harness/node_modules/pnpm/bin/pnpm.mjs /usr/local/bin/pnpm && \
+    node -e 'const fs=require("fs");if(process.version!=="v22.23.2"||JSON.parse(fs.readFileSync("/opt/harness/node_modules/@deepseek-ai/dsh/package.json")).version!=="0.1.7-alpha.2")throw Error("Dependency version mismatch")'
+COPY ultra/source /opt/sm75-workbench
+COPY ultra/overlay/font-scale.py /opt/vllm-sm75/font-scale.py
+COPY ultra/overlay/pstate-supervisor.sh /opt/vllm-sm75/pstate-supervisor.sh
+COPY build-dependencies/harness-theme.tgz /tmp/harness-theme.tgz
+RUN rm -rf /opt/harness/node_modules/@deepseek-ai/dsh-client-ui-theme && \
+    mkdir -p /opt/harness/node_modules/@deepseek-ai/dsh-client-ui-theme && \
+    tar -xzf /tmp/harness-theme.tgz -C /opt/harness/node_modules/@deepseek-ai/dsh-client-ui-theme --strip-components=1 && \
+    rm /tmp/harness-theme.tgz && \
+    python3 /opt/vllm-sm75/font-scale.py && \
+    node /opt/sm75-workbench/console/install-native-plugins.mjs && \
+    node /opt/sm75-workbench/console/verify-client-bundles.mjs && \
+    chmod +x /opt/vllm-sm75/pstate-supervisor.sh
+ENV SM75_EDITION=ultra SM75_CONSOLE_HOST=0.0.0.0 SM75_CONSOLE_PORT=1615 SM75_SINGLE_CONTAINER=1 NVIDIA_DRIVER_CAPABILITIES=compute,utility
+LABEL org.opencontainers.image.version="0.1.7-ultra-beta-next-rc-20261003" io.sm75.source-sha256="${SOURCE_SHA256}"
+EXPOSE 1615 8000
+WORKDIR /opt/sm75-workbench
+ENTRYPOINT ["python3", "/opt/vllm-sm75/runtime-entrypoint.py"]
+CMD []

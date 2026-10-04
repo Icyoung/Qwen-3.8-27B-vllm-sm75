@@ -1,3 +1,4 @@
+import {applyManagedModelSelection} from './native-model-selection.mjs';
 import {applyNativeConfigWatch} from './native-config-watch.mjs';
 import {applyUnifiedShell} from "./native-shell.mjs";
 import {applyBranding, assertHarnessVersion} from './apply-branding.mjs';
@@ -46,6 +47,7 @@ export function installNativePlugins(base = '/opt/harness/node_modules', console
   applyBranding(base, consoleRoot);
   applyUnifiedShell(base);
   applyNativeConfigWatch(base);
+  applyManagedModelSelection(base);
   return {installed: packages.map(([, name]) => name)};
 }
 if (process.argv[1] && fs.existsSync(process.argv[1]) && fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url))

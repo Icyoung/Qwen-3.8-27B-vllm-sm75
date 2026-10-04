@@ -3,7 +3,15 @@ import json
 import sys
 import time
 import subprocess
-import pynvml as n
+try:
+    import pynvml as n
+    n.nvmlInit()
+except Exception:
+    # Management pages remain usable before GPU devices/driver are mounted.
+    print(json.dumps({'time': time.time(), 'gpus': [], 'p2p': [], 'topology': {},
+                      'available': False,
+                      'unavailableReason': '无法读取 GPU，请检查容器 GPU 挂载和 NVIDIA 驱动。'}))
+    sys.exit(0)
 
 def value(fn, *args):
     try:
@@ -12,7 +20,6 @@ def value(fn, *args):
     except n.NVMLError:
         return None
 
-n.nvmlInit()
 rows = []
 handles = [n.nvmlDeviceGetHandleByIndex(i) for i in range(n.nvmlDeviceGetCount())]
 for i, h in enumerate(handles):

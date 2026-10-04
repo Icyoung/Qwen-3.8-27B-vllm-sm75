@@ -85,6 +85,8 @@ COPY vllm/entrypoints/serve/utils/api_utils.py \
     /tmp/sm75-overlay/entrypoints/serve/utils/api_utils.py
 COPY vllm/entrypoints/serve/instrumentator/metrics.py \
     /tmp/sm75-overlay/entrypoints/serve/instrumentator/metrics.py
+COPY vllm/entrypoints/serve/instrumentator/request_timing.py \
+    /tmp/sm75-overlay/entrypoints/serve/instrumentator/request_timing.py
 COPY vllm/entrypoints/serve/instrumentator/monitor.py \
     /tmp/sm75-overlay/entrypoints/serve/instrumentator/monitor.py
 COPY vllm/entrypoints/serve/instrumentator/dashboard.html \
@@ -130,6 +132,7 @@ COPY vllm/v1/engine/core_client.py \
 COPY vllm/third_party/flash_qla_sm75 \
     /tmp/sm75-overlay/third_party/flash_qla_sm75
 COPY docker/helpers/install_sm75_overlay.py /tmp/install_sm75_overlay.py
+COPY docker/helpers/patch_request_usage.py /tmp/patch_request_usage.py
 COPY docker/helpers/patch_transformers_startup.py /tmp/patch_transformers_startup.py
 COPY docker/helpers/verify_sm75_image.py /tmp/verify_sm75_image.py
 RUN mkdir -p /opt/vllm-sm75/source /opt/vllm-sm75/extensions && \
@@ -174,6 +177,10 @@ RUN python3 /tmp/verify_sm75_image.py && \
     test -s /opt/vllm-sm75/source/flash_qla_sm75/LICENSE && \
     test -s /opt/vllm-sm75/source/flash_qla_sm75/SOURCE.md && \
     rm -f /tmp/verify_sm75_image.py
+
+COPY docker/next /opt/vllm-sm75/next
+RUN python3 /opt/vllm-sm75/next/install.py
+COPY docker/next/templates /opt/vllm-sm75/templates
 
 COPY docker/speculative /opt/vllm-sm75/speculative
 COPY docker/helpers/install_speculative.py /tmp/install_speculative.py
@@ -224,3 +231,19 @@ RUN curl -fsSL -o /usr/local/bin/nvidia-pstated \
 ENV SM75_FA2_SMALLQ_GRAPH=1 SM75_GDN_B1_METADATA=1
 
 LABEL ai.vllm.sm75.modes="base,mtp,dflash2"
+
+# Optional LMCache MP: explicit build/runtime opt-in, same contract as Ultra.
+ARG INSTALL_LMCACHE=0
+COPY ultra/source/lmcache /opt/vllm-sm75/lmcache
+COPY ultra/source/console/lmcache_probe.py /opt/vllm-sm75/console/lmcache_probe.py
+COPY docker/helpers/lmcache-launch.py /opt/vllm-sm75/lmcache-launch.py
+COPY docker/helpers/lmcache-entrypoint.sh /opt/vllm-sm75/lmcache-entrypoint.sh
+RUN chmod +x /opt/vllm-sm75/lmcache-entrypoint.sh && \
+    if [ "$INSTALL_LMCACHE" = 1 ]; then python3 /opt/vllm-sm75/lmcache/install.py --install --build-no-gpu; \
+    elif [ "$INSTALL_LMCACHE" != 0 ]; then echo 'INSTALL_LMCACHE must be 0 or 1' >&2; exit 2; fi
+
+COPY ultra/source/profiles /opt/vllm-sm75/profiles
+COPY docker/helpers/runtime-entrypoint.py /opt/vllm-sm75/runtime-entrypoint.py
+ENV SM75_EDITION=standard
+ENTRYPOINT ["python3", "/opt/vllm-sm75/runtime-entrypoint.py"]
+CMD []

@@ -6,7 +6,7 @@
 #
 # 设计:把父类的 num_spec_tokens 实例属性改成 property。关闭时 getter 返回 0,
 # 于是父类里所有 self.num_spec_tokens 的读取(主 gate / pad 路径 / prefill
-# lookahead / KV budget / 统计)自动变 0,无需 override schedule()。不碰上游
+# lookahead / KV budget / 统计)自动变 0。可选Next混合预算只包装schedule，不碰上游
 # scheduler.py / async_scheduler.py,上游随便改只跟 num_spec_tokens 这个稳定
 # 机制耦合。
 #
@@ -51,6 +51,32 @@ class SM75Scheduler(AsyncScheduler):
         # 初始值由 VLLM_SPEC_DECODE 决定, 默认开(未设 = 启动即开)。
         self._spec_decode_enabled = _initial_spec_decode_enabled()
         super().__init__(*args, **kwargs)
+        config = self.vllm_config
+        family = getattr(config.model_config.hf_text_config, "model_type", "")
+        supported = (family in ("qwen4_exp", "qwen4_exp_text", "qwen3_8_flash_next")
+                     and config.parallel_config.tensor_parallel_size == 8)
+        mixed_budget = int(os.environ.get("VLLM_SM75_NEXT_MIXED_TOKEN_BUDGET", "0")) if supported else 0
+        if mixed_budget < 0:
+            raise ValueError("VLLM_SM75_NEXT_MIXED_TOKEN_BUDGET must be nonnegative")
+        self._sm75_mixed_budget = mixed_budget
+
+    def schedule(self, throttle_prefills: bool = False):
+        # Limit only mixed work. Keep the configured full budget for single
+        # requests, pure prefill and pure decode; preallocated capacities stay
+        # unchanged. The parent remains responsible for all token/KV accounting.
+        full_budget = self.max_num_scheduled_tokens
+        limit = self._sm75_mixed_budget
+        mixed = (limit > 0
+                 and any(not r.is_prefill_chunk for r in self.running)
+                 and (any(r.is_prefill_chunk for r in self.running)
+                      or bool(self.waiting) or bool(self.skipped_waiting)))
+        if mixed:
+            decode_reserve = self.scheduler_config.max_num_seqs * (1 + self.num_spec_tokens)
+            self.max_num_scheduled_tokens = min(full_budget, max(limit, decode_reserve))
+        try:
+            return super().schedule(throttle_prefills=throttle_prefills)
+        finally:
+            self.max_num_scheduled_tokens = full_budget
 
     def set_spec_decode_enabled(self, enabled: bool) -> None:
         self._spec_decode_enabled = bool(enabled)

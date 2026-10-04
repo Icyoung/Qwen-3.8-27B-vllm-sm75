@@ -31,7 +31,7 @@ export function lmcachePlan(profile, {runtimeFingerprint = ""} = {}) {
     .sort(([a], [b]) => a.localeCompare(b)));
   const namespace = createHash('sha256').update(JSON.stringify({
     schema: 1, lmcache: LMCACHE_VERSION, vllm: '0.30.0-sm75-v0.1.6',
-    args, env: inheritedLayoutEnv, modelIdentity, runtimeFingerprint,
+    args, cacheLayout: {chunkSize: c.chunkSize}, env: inheritedLayoutEnv, modelIdentity, runtimeFingerprint,
   })).digest('hex');
   const diskPath = c.diskPath ? path.posix.join(c.diskPath, namespace) : '';
   const serverArgs = ['-m', 'lmcache.v1.multiprocess.http_server',

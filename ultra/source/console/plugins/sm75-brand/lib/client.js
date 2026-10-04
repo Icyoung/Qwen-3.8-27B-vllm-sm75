@@ -20,7 +20,11 @@ window.__ModuleLoader__.load({
       };
     }
     const settingsPages = new Set(["appearance", "assistant", "connections"]);
-    const settingsTab = id => id === "general" ? "appearance" : id === "models" ? "connections" : "assistant";
+    // Third-party section contributions live with their plugins; they must not
+    // silently become assistant settings merely because the id is unfamiliar.
+    const settingsTab = id => id === "general" ? "appearance"
+      : id === "models" || id === "account" ? "connections"
+      : id === "agent-presets" ? "assistant" : "plugins";
     const appearanceItems = new Set(["language","appearance","font-size","transcript-view","performance-usage","current-version"]);
     const sectionVisible = (id,page) => id==="general"
       ? page==="appearance" || page==="assistant" : settingsTab(id)===page;
@@ -116,7 +120,7 @@ window.__ModuleLoader__.load({
         changed.clear();
       };
     }
-    function Frame({useStore, usePanelInfo, actions, renderSlot}) {
+    function Frame({useStore, useSessions, usePanelInfo, actions, renderSlot, sm75DocumentTitle}) {
       const layout = useStore(state => state.layoutInfo);
       const panel = usePanelInfo(info => info.activePanelId);
       activePanel = panel;
@@ -141,14 +145,16 @@ window.__ModuleLoader__.load({
         observer.observe(el);
         return () => observer.disconnect();
       }, [actions]);
+      const panelNotification = React.useRef(false);
       React.useEffect(() => {
         const entry = ctx.slots.entries("sidebar.panellist").find(e => e.options.id === panel);
         const label = typeof entry?.options.label === "function" ? entry.options.label() : entry?.options.label;
-        emit("sm75-native-panel", {id: panel, label: label || "工作台"});
+        emit("sm75-native-panel", {id: panel, label: label || "工作台", initial: !panelNotification.current});
+        panelNotification.current = true;
       }, [panel]);
       const available = layout.viewportWidth;
       const canShow = available >= 700;
-      const width = canShow ? Math.min(Math.max(300, layout.rightbar ?? available * .45), available * .75) : 0;
+      const width = canShow ? Math.min(Math.max(300, layout.rightbar ?? available * .45), available * .75, available - 400) : 0;
       const track = layout.rightbarTrack ? width : 0;
       const resize = event => {
         if (event.button !== 0) return;
@@ -163,6 +169,7 @@ window.__ModuleLoader__.load({
         style:{gridTemplateColumns:"minmax(0,1fr) "+track+"px"},
         "data-rightbar-fullscreen":layout.rightbarFullscreen || undefined,
         "data-rightbar-instant":layout.rightbarInstant || undefined},
+        sm75DocumentTitle ? h(sm75DocumentTitle,{useSessions,usePanelInfo,productTitle:"工作台"}) : null,
         renderSlot("sidebar", {collapsed:false,width:248}),
         h("div",{className:"sm75-native-main"},panelKeys.map(key =>
           h("div",{key,className:"sm75-native-panel",hidden:key!==activeKey,
@@ -216,20 +223,28 @@ window.__ModuleLoader__.load({
         : onboardingActive ? steps.find(item=>!completed.has(item.id)) : undefined;
       React.useEffect(()=>{if(!onboardingActive)setCompleted(new Set());},[onboardingActive]);
       React.useEffect(()=>{
-        if(page!==null)setVisited(previous=>previous.has(page)?previous:new Set([...previous,page]));
-      },[page]);
+        const selected = route === "plugins" ? "plugins" : page;
+        if(selected!==null)setVisited(previous=>previous.has(selected)?previous:new Set([...previous,selected]));
+      },[page,route]);
       React.useEffect(()=>{
         globalThis.__SM75_WORKBENCH__.reconnect=reconnect;
         emit("sm75-native-connection",{state:connection});
       },[connection,reconnect]);
       const openSection=id=>{
         const target=settingsTab(id);
-        selectSettings(target);
-        emit("sm75-native-settings",{id:target});
+        if(target === "plugins") {
+          selectSettings(null);
+          emit("sm75-native-navigate",{page:"plugins"});
+        } else {
+          selectSettings(target);
+          emit("sm75-native-settings",{id:target});
+        }
       };
       const close=()=>{selectSettings(null);emit("sm75-native-navigate");};
-      const sections=rows.filter(row=>sectionVisible(row.id,page)
-        || [...visited].some(tab=>sectionVisible(row.id,tab)));
+      const sections=rows.filter(row=>settingsTab(row.id)!=="plugins" && (sectionVisible(row.id,page)
+        || [...visited].some(tab=>tab!=="plugins" && sectionVisible(row.id,tab))));
+      const pluginSections=route==="plugins" || visited.has("plugins")
+        ? rows.filter(row=>settingsTab(row.id)==="plugins") : [];
       return h(React.Fragment,null,
         portal(h("div",{className:"sm75-native-settings","data-native-settings-page":page??""},
           page==="appearance" ? h("div",{className:"sm75-native-settings-actions"},renderSlot("settings.action",{})) : null,
@@ -237,6 +252,11 @@ window.__ModuleLoader__.load({
             className:"sm75-native-settings-section","data-native-settings-section":row.id},
             renderSlot("settings.section",{close},{only:row.id})))),
           "nativeSettingsSurface"),
+        portal(h("div",{className:"sm75-native-settings",hidden:route!=="plugins",
+          "data-native-plugin-settings":""},pluginSections.map(row=>h("section",{key:row.id,
+            className:"sm75-native-settings-section","data-native-settings-section":row.id},
+            row.id!=="plugins" ? h("h2",null,row.label || row.id) : null,
+            renderSlot("settings.section",{close},{only:row.id})))),"nativePluginSettingsSurface"),
         step!==undefined && route==="harness" ? portal(renderSlot("settings.onboarding",{
           stepId:step.id,explicit:requestedOnboarding!==undefined,
           complete:()=>{setRequestedOnboarding(undefined);setCompleted(previous=>new Set([...previous,step.id]));},
@@ -272,8 +292,8 @@ window.__ModuleLoader__.load({
       const api={ready:false,
         fontSettled:async()=>{
           let pending,accepted;
-          do {pending=ctx.theme.sm75FontWrite;accepted=await pending;}
-          while(pending!==ctx.theme.sm75FontWrite);
+          do {pending=ctx.theme.sm75AppearanceWrite || ctx.theme.sm75FontWrite;accepted=await pending;}
+          while(pending!==(ctx.theme.sm75AppearanceWrite || ctx.theme.sm75FontWrite));
           return accepted!==false;
         },
         panels:()=>ctx.slots.entries("sidebar.panellist").map(e=>({id:e.options.id,label:typeof e.options.label==="function"?e.options.label():e.options.label})),
@@ -301,17 +321,42 @@ window.__ModuleLoader__.load({
       ctx.slots.inject("conversation.hero.brand.mark",()=>ctx.slots.register({name:"conversation.hero.brand.mark",priority:-100},Mark));
       ctx.effect(installNativeFontScale,"sm75 native global font scale");
       ctx.effect(()=>{
+        const readStored=key=>{try{return globalThis.localStorage?.getItem(key);}catch{return null;}};
+        const writeStored=(key,value)=>{try{globalThis.localStorage?.setItem(key,value);}catch{}};
+        const cached=globalThis.__SM75_APPEARANCE_SNAPSHOT__;
+        const cachedFont=Number(cached?.fontSize ?? readStored("sm75-font-size"));
+        const cachedMode=cached?.colorMode ?? readStored("sm75-color-mode");
+        let fontRestoring=true,themeRestoring=true;
         const syncSnapshot=snapshot=>{
-          document.dispatchEvent(new CustomEvent("sm75-set-theme",{detail:snapshot.active.colorScheme}));
+          // The native owner explicitly reports when its durable scope arrives.
+          // Until then the pre-paint snapshot owns presentation; startup never
+          // writes a cache/default preference back into the host settings.
+          if(ctx.theme.sm75AppearanceRestored===false)return;
+          if(ctx.theme.sm75AppearanceRestored===true)fontRestoring=themeRestoring=false;
+          const mode=snapshot.active.colorScheme;
+          if(!(themeRestoring && ["dark","light"].includes(cachedMode) && cachedMode!==mode)) {
+            themeRestoring=false;
+            emit("sm75-set-theme",mode);
+          }
           const size=Number(snapshot.fontSize);
-          if(Number.isFinite(size)&&size>=12&&size<=26)document.documentElement.style.setProperty("--ui-fs",String(size/14));
+          if(!Number.isInteger(size)||size<12||size>17)return;
+          // Compatibility with an already-loaded older layout keeps the old
+          // cache protection until the saved size or settings UI confirms it.
+          if(fontRestoring&&cachedFont>=12&&cachedFont<=17&&cachedFont!==size)return;
+          fontRestoring=false;
+          writeStored("sm75-font-size",String(size));
+          document.documentElement.style.setProperty("--ui-fs",String(size/14));
         };
         const off=ctx.on("theme/change",syncSnapshot);
-        const sync=event=>api.setTheme(event.detail);
+        const sync=event=>{themeRestoring=false;api.setTheme(event.detail);};
         document.addEventListener("sm75-theme-mode",sync);
-        api.setTheme(localStorage.getItem("sm75-color-mode")||"dark");
         syncSnapshot(ctx.theme.getTheme());
-        return ()=>{off();document.removeEventListener("sm75-theme-mode",sync);settingsListeners.clear();settingsPage=null;api.ready=false;delete globalThis.__SM75_WORKBENCH__;delete globalThis.__SM75_NATIVE_SHELL__;};
+        const reconcileFont=()=>{
+          if(ctx.theme.sm75AppearanceRestored===false)return;
+          fontRestoring=themeRestoring=false;syncSnapshot(ctx.theme.getTheme());
+        };
+        document.addEventListener("sm75-native-settings",reconcileFont);
+        return ()=>{off();document.removeEventListener("sm75-native-settings",reconcileFont);document.removeEventListener("sm75-theme-mode",sync);settingsListeners.clear();settingsPage=null;api.ready=false;delete globalThis.__SM75_WORKBENCH__;delete globalThis.__SM75_NATIVE_SHELL__;};
       },"sm75 unified navigation, settings and theme");
     }
     return {apply,inject:["slots","layout","theme"]};

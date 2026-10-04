@@ -1,9 +1,75 @@
+import {applyWorkspaceSearch} from './native-workspace.mjs';
 import fs from "node:fs";
 import path from "node:path";
+
+// Restore cached presentation before the first native snapshot, then expose
+// the first accepted host settings read. Neither operation writes preferences.
+export function patchNativeAppearanceRestore(source) {
+  const marker = "/* sm75-appearance-restore */";
+  if (source.includes(marker)) return source;
+  const initialize = /(constructor\(ctx, host\) \{[\s\S]*?)this\.preference = DEFAULT_PREFERENCE;/;
+  const adopt = /(const section = this\.host\.getSnapshot\(\)\.value;\s*if \(section === void 0\) return;)/;
+  const unchanged = /if\s*\(this\.preference === section\.preference && this\.fontSize === fontSize\)\s*return;/;
+  for (const pattern of [initialize, adopt, unchanged])
+    if ([...source.matchAll(new RegExp(pattern.source, "g"))].length !== 1)
+      throw Error("Harness appearance restore anchor changed");
+  return source.replace(initialize, (_match, prefix) => prefix + marker + `
+        this.sm75AppearanceRestored = false;
+        const cached = globalThis.__SM75_APPEARANCE_SNAPSHOT__;
+        this.preference = cached?.colorMode === "light" || cached?.colorMode === "dark"
+          ? cached.colorMode : DEFAULT_PREFERENCE;
+        if (Number.isInteger(cached?.fontSize) && cached.fontSize >= 12 && cached.fontSize <= 17)
+          this.fontSize = cached.fontSize;`)
+    .replace(adopt, "$1\n        const firstAppearance = this.sm75AppearanceRestored !== true;\n        this.sm75AppearanceRestored = true;")
+    .replace(unchanged, "if (!firstAppearance && this.preference === section.preference && this.fontSize === fontSize) return;");
+}
+
+// Theme and font share one native ConfigForm write queue. A later theme write
+// supersedes the mirror fold of an earlier font write, so settle the whole
+// appearance queue before adopting either field from its accepted snapshot.
+export function patchNativeAppearanceWrites(source) {
+  const marker = "/* sm75-appearance-write-settlement */";
+  if (source.includes(marker)) return source;
+  const themeWrite = "if (isThemePreference(id)) this.host.set(THEME_PREFERENCE_FIELD, id);";
+  const fontWrite = /\/\* sm75-font-write-settlement \*\/[\s\S]*?this\.sm75FontWrite = Promise\.resolve\(this\.host\.set\(FONT_SIZE_FIELD, px\)\)\.then\([\s\S]*?\n        \);/;
+  const fontAdopt = "const fontSize = this.sm75FontPending ? this.fontSize : section.fontSize;";
+  const preferenceCheck = "this.preference === section.preference && this.fontSize === fontSize";
+  const preferenceAdopt = "this.preference = section.preference;";
+  const adoptMethod = "adopt() {";
+  for (const anchor of [themeWrite, fontAdopt, preferenceCheck, preferenceAdopt, adoptMethod])
+    if (source.split(anchor).length !== 2) throw Error("Harness appearance write anchor changed");
+  if ([...source.matchAll(new RegExp(fontWrite.source, "g"))].length !== 1)
+    throw Error("Harness font write settlement anchor changed");
+  source = source.replace(themeWrite, "if (isThemePreference(id)) this.sm75QueueAppearanceWrite(THEME_PREFERENCE_FIELD, id);")
+    .replace(fontWrite, "/* sm75-font-write-settlement */\n        this.sm75FontWrite = this.sm75QueueAppearanceWrite(FONT_SIZE_FIELD, px);")
+    .replace(fontAdopt, "const fontSize = this.sm75AppearancePending ? this.fontSize : section.fontSize;\n        const preference = this.sm75AppearancePending ? this.preference : section.preference;")
+    .replace(preferenceCheck, "this.preference === preference && this.fontSize === fontSize")
+    .replace(preferenceAdopt, "this.preference = preference;")
+    .replace(adoptMethod, marker + `
+      sm75QueueAppearanceWrite(field, value) {
+        const generation = this.sm75AppearanceGeneration = (this.sm75AppearanceGeneration || 0) + 1;
+        this.sm75AppearancePending = true;
+        if (field === FONT_SIZE_FIELD) this.sm75FontPending = true;
+        const finish = () => {
+          if (generation !== this.sm75AppearanceGeneration) return;
+          this.sm75AppearancePending = false;
+          this.sm75FontPending = false;
+          this.adopt();
+        };
+        this.sm75AppearanceWrite = Promise.resolve(this.host.set(field, value)).then(
+          accepted => { finish(); return accepted; },
+          error => { finish(); this.ctx.logger?.warn?.("Unable to save appearance settings", error); return false; }
+        );
+        return this.sm75AppearanceWrite;
+      }
+      adopt() {`);
+  return source;
+}
 
 // Fixed-release adapter: retain each owner's service, store and child-slot
 // declarations; replace only visual shell components at render time.
 export function applyUnifiedShell(base) {
+  applyWorkspaceSearch(base);
   for (const [pkg, name, renderer] of [
     ["dsh-client-ui-layout", "AppFrame", "frame"],
     ["dsh-client-ui-sidebar", "SidebarRoot", "sidebar"],
@@ -33,6 +99,16 @@ export function applyUnifiedShell(base) {
       throw Error("Harness panel reader anchor changed");
     layoutSource=layoutSource.replace(anchor,"$1\n/* sm75-active-panel-reader */\nlayout.sm75ActivePanel = () => instance.getSnapshot().panelInfo.activePanelId;");
     fs.writeFileSync(layoutFile,layoutSource);
+  }
+  // AppFrame owns the native durable-session document title. Its visual
+  // replacement must still mount that owner instead of leaving it unreachable.
+  const titleMarker = "/* sm75-native-document-title */";
+  if (!layoutSource.includes(titleMarker)) {
+    const delegate = "return shell.frame(props, NativeAppFrame);";
+    if (layoutSource.split(delegate).length !== 2 || layoutSource.split("function DocumentTitle(").length !== 2)
+      throw Error("Harness native document title anchor changed");
+    layoutSource = layoutSource.replace(delegate, titleMarker + "\n  return shell.frame({...props, sm75DocumentTitle: DocumentTitle}, NativeAppFrame);");
+    fs.writeFileSync(layoutFile, layoutSource);
   }
   // This native control now scales the entire shared interface. Keep its
   // original settings store and actions, but describe the actual scope.
@@ -77,7 +153,7 @@ export function applyUnifiedShell(base) {
       .replace("this.fontSize === section.fontSize","this.fontSize === fontSize")
       .replace("this.fontSize = section.fontSize;","this.fontSize = fontSize;");
   }
-  fs.writeFileSync(themeFile,theme);
+  fs.writeFileSync(themeFile,patchNativeAppearanceWrites(patchNativeAppearanceRestore(theme)));
   const file=path.join(base,"@deepseek-ai/dsh-client-ui-open-in-app","lib/client.js");
   let source=fs.readFileSync(file,"utf8");
   const route='"/open-in-app/';

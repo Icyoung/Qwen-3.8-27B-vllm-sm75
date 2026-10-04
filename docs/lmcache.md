@@ -1,4 +1,4 @@
-# LMCache 分层缓存（v0.1.6 实验功能）
+# LMCache 分层缓存（v0.1.7 beta，实验功能）
 
 本候选接入 LMCache MP：GPU 保留当前计算需要的 KV，CPU 保存可复用前缀，专用磁盘保存更大的缓存集合。重复长提示、公共系统提示或恢复会话时，可从较低层把匹配的 KV 搬回 GPU，减少重复预填充。磁盘层的收益与传输开销取决于命中率、CPU/PCIe 和存储速度；首次请求仍需正常计算。
 
@@ -17,9 +17,15 @@ CPU 与磁盘都不参与本实现的 GPU 注意力计算，容量不能直接�
 
 ## 安装入口
 
-本项目固定的cu129扩展默认不额外安装、不启用。官方基座可能自带未适配的LMCache；本轮完整标准版自带0.5.5，但其CUDA13依赖声明与固定cu129栈不符，不能直接启用，必须先安装下面的固定扩展。构建 Ultra 时显式添加 `--build-arg INSTALL_LMCACHE=1`；现有全量构建保护仍生效。该选项同时适用于 Ultra 的完整 Dockerfile 和增量候选 Dockerfile。
+本项目固定的cu129扩展默认不额外安装、不启用。官方基座可能自带未适配的LMCache；本轮完整标准版自带0.5.5，但其CUDA13依赖声明与固定cu129栈不符，不能直接启用，必须先安装下面的固定扩展。标准版与 Ultra 的公共构建入口都接受 `INSTALL_LMCACHE=1`；默认值为 `0`。该选项覆盖标准 full/fast 和 Ultra full/ui 构建路径，复用同一个安装器与启动探针；现有全量构建保护仍生效。安装不等于启用，运行时还须显式选择 LMCache。
 
-已有**经过验证的 v0.1.6 镜像**可以使用单独扩展层（从仓库根目录构建）。该层只安装 LMCache；Ultra 控制台的新功能仍需本候选的 console 源码，不能仅给旧 UI 镜像加此层：
+```bash
+EDITION=standard INSTALL_LMCACHE=1 bash docker/build.sh
+# 若使用 Ultra：在已经验证的标准基础镜像上构建
+EDITION=ultra INSTALL_LMCACHE=1 bash docker/build.sh
+```
+
+已有**经过验证的 v0.1.6 镜像**可以使用单独扩展层（从仓库根目录构建）。该层安装 LMCache 并附带标准版手动启动助手；Ultra 控制台的新功能仍需本候选的 console 源码，不能仅给旧 UI 镜像加此层：
 
 ```bash
 docker build -f docker/Dockerfile.lmcache \
@@ -61,28 +67,68 @@ python3 /opt/sm75-workbench/lmcache/install.py --install
 
 换模型、TP、KV 精度或注意力后端后，应重新核对 `Setting attention block size to N tokens` 及所有组的共同粒度；chunk 必须是共同粒度的倍数。预填充批次至少为 N，设为 `2N-1`（本例 3135）便于逐块快照并让解码与预填充并行调度。vLLM/连接器仍执行自身的容量与粒度检查，工作台不绕过它们。
 
-## 标准版的同容器启动示例
+## 两版相同的 Docker 参数
 
-先在模型容器内启动 MP 服务。目录中的 `layout-id` 需由操作者为具体权重、TP、KV 精度和引擎/后端版本单独命名，不可跨布局复用；Ultra 会根据模型元数据、参数、布局环境和安装源码指纹自动生成子目录。
+以下变量可用于标准版与 Ultra。Ultra 在管理服务启动时导入选中的运行配置，之后面板保存的修改生效；下次管理服务/容器启动才会再次导入 Docker 环境。只设置 `SM75_DEFAULT_PROFILE` 也会选择对应配置。标准版最后附加的 CLI 仍可覆盖普通引擎参数，但 LMCache 不兼容参数会被启动助手拒绝。
+
+| 参数 | 默认值与单位 |
+| --- | --- |
+| `LMCACHE_ENABLED` | `0`，显式 `1` 选择 LMCache |
+| `LMCACHE_CPU_GIB` | `8`，整个缓存服务的 CPU GiB，不乘 TP |
+| `LMCACHE_CHUNK_SIZE` | 必填正整数，无通用默认值 |
+| `LMCACHE_DISK_ROOT` | 可选宿主机专用持久目录，启动脚本挂载它 |
+| `LMCACHE_DISK_PATH` | 容器目录；有 `DISK_ROOT` 时默认 `/lmcache`，否则空值只启 CPU |
+| `LMCACHE_MIN_FREE_DISK_GIB` | `4`，启动空闲空间门槛，非容量限额 |
+| `LMCACHE_PORT` / `LMCACHE_HTTP_PORT` | `5555` / `5556`，仅容器内 localhost，不发布到宿主 |
+
+原生 `CPU_KV_GIB` 支持非负十进制 GiB（例如 `10.25`），与面板一样四舍五入到安全整数字节数；`0` / `0.0` 关闭。正数舍入不足 1 字节、超过安全整数范围或非法格式会拒绝。
+
+只有标准脚本自身默认的原生 CPU KV 8 GiB 会在选择 LMCache 后让位。显式 `CPU_KV_GIB>0`、自定义 `KV_TRANSFER_CONFIG`、投机或休眠组合都会报错。Ultra 保存配置的原生 CPU KV 需要显式 `CPU_KV_GIB=0` 关闭；已有自定义连接器要明确用 `KV_TRANSFER_CONFIG=''` 移除，CPU 便捷值不会代为删除。已存投机参数可明确设置 `SPECULATIVE_CONFIG=''` 关闭。选择 `POWER_MODE=pstate`，移除 `--enable-sleep-mode` 等 allocator 参数；启动导入不会静默删掉它们。
+
+下面的共同参数仅适用于前文已验证的 Qwen3.8-27B、TP4、FP8 KV、target-only 布局，换模型必须重新核对 chunk。示例不执行任何实际构建或部署。
 
 ```bash
-python3 -m lmcache.v1.multiprocess.http_server \
-  --host 127.0.0.1 --port 5555 \
-  --http-host 127.0.0.1 --http-port 5556 \
-  --no-isolated-ipc --chunk-size 1568 --separate-object-groups \
-  --l1-size-gb 8 --l1-init-size-gb 1 --eviction-policy LRU \
-  --l2-adapter '{"type":"fs","base_path":"/lmcache/layout-id","use_odirect":false}'
+export VLLM_API_KEY='替换为自己的模型 API Key'
+export MODEL_ROOT=/srv/models
+export MODEL=/models/Qwen3.8-27B-FP8
+export POWER_MODE=pstate
+export PSTATE_NVAPI_LIB=/usr/lib64/libnvidia-api.so.1
+export TENSOR_PARALLEL_SIZE=4
+export MAX_MODEL_LEN=8192
+export MAX_NUM_BATCHED_TOKENS=3135
+export CPU_KV_GIB=0
+export SPECULATIVE_CONFIG=''
+export LMCACHE_ENABLED=1
+export LMCACHE_CPU_GIB=8
+export LMCACHE_CHUNK_SIZE=1568
+# CPU＋磁盘；只用 CPU 时不要设置下面两项
+export LMCACHE_DISK_ROOT=/srv/vllm-lmcache
+export LMCACHE_DISK_PATH=/lmcache
 ```
 
-待 `/healthcheck` 返回 `status: healthy`，在同一容器的模型启动参数中加入：
+标准版使用已安装固定 LMCache 扩展的镜像：
 
 ```bash
---enable-prefix-caching --mamba-cache-mode align \
---max-num-batched-tokens 3135 \
---kv-transfer-config '{"kv_connector":"LMCacheMPConnector","kv_role":"kv_both","kv_connector_module_path":"lmcache.integration.vllm.lmcache_mp_connector","kv_connector_extra_config":{"lmcache.mp.host":"tcp://127.0.0.1","lmcache.mp.port":5555,"lmcache.mp.isolated_ipc":false}}'
+EDITION=standard VLLM_SM75_CACHE_ROOT=/srv/vllm-cache \
+  bash docker/run.sh
 ```
 
-这只是缓存参数，完整模型、GPU 和内存预算沿用对应模型的已验证配置；不能直接给任意模型套用 1568。停止顺序为先模型、后 MP，等待已完成写入后再做正常重启。后台进程必须由现有进程管理器负责退出与日志。
+Ultra 使用相同环境和自己的持久数据目录；已有多个运行配置时指定需要导入的配置 ID：
+
+```bash
+EDITION=ultra ULTRA_DATA_ROOT=/srv/vllm-ultra \
+  SM75_DEFAULT_PROFILE=你的运行配置ID bash docker/run.sh
+```
+
+新建 Ultra 数据目录时不设置 `SM75_DEFAULT_PROFILE`，由 `MODEL` 创建可见配置。保存了自定义连接器的旧配置需先明确处理冲突，失败时面板保持可用，旧配置不会自动启动。API Key 同名环境会导入 Ultra API 接入设置，复制/更换由面板统一处理。
+
+标准助手在同一容器内依次执行：检查配置、共享探针验证 ABI/packed4D/真实 CLI、检查专用磁盘与端口、启动 MP 并等待 `/healthcheck` 返回 `status: healthy`、启动 P-State 与 vLLM。依赖缺失、端口占用、就绪超时、进程提前退出或收到停止信号都会失败并清理自己启动的进程；退出顺序始终先模型、后缓存。`LMCACHE_ENABLED=0` 沿用原标准启动路径。
+
+不使用公共脚本时，标准扩展镜像也提供 `/opt/vllm-sm75/lmcache-entrypoint.sh` 作为 Docker entrypoint；传入正常的 `MODEL ...vllm 参数`，提供以上环境、P-State 驱动库和必要卷即可。助手自动添加同 Ultra 的 `LMCacheMPConnector`、`--enable-prefix-caching`、`--mamba-cache-mode align`，不需要另起外部缓存容器。fast 镜像仍须先完成其现有 SM75 overlay 编译/验收流程。
+
+磁盘模式要求标准助手能读取本地模型配置/权重元数据，建议使用 `/models` 只读挂载。标准与 Ultra 都按模型身份、完整引擎参数、有效 chunk size、布局环境和安装源码指纹生成子目录；标准使用独立 `standard-v1-` 命名空间，不尝试复用 Ultra 的旧目录。更换布局后旧文件保留，需用户自行管理磁盘配额和清理。停止不会删除用户磁盘缓存；进行中的异步写入不保证完成。
+
+本轮 v0.1.7 beta 新入口仅通过 CPU/模拟进程、打包与环境传递检查，未运行新镜像构建或真实 GPU；历史 GPU 验收仍以 v0.1.6 的独立记录和限定组合为准。
 
 ## 磁盘与兼容边界
 
@@ -96,4 +142,4 @@ python3 -m lmcache.v1.multiprocess.http_server \
 - [官方 vLLM 兼容说明](https://docs.lmcache.ai/getting_started/compatibility.html)
 - [官方 Qwen 混合模型说明](https://docs.lmcache.ai/recipes/qwen3_5.html)
 
-构建环境没有 GPU 时，Dockerfile 使用 `--build-no-gpu`，仍加载两个原生扩展检查 ABI，但将需要 `libcuda.so.1` 的 MP 连接器导入留给 GPU 运行时。Ultra 启动 LMCache 前必须通过 `lmcache_probe.py` 的完整检查；镜像安装成功不等于分层缓存已经通过 GPU 验收。
+构建环境没有 GPU 时，Dockerfile 使用 `--build-no-gpu`，仍加载两个原生扩展检查 ABI，但将需要 `libcuda.so.1` 的 MP 连接器导入留给 GPU 运行时。两版启动 LMCache 前都必须通过 `lmcache_probe.py` 的完整检查；镜像安装成功不等于分层缓存已经通过 GPU 验收。

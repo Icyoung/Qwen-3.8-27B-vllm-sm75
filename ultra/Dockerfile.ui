@@ -1,0 +1,23 @@
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+ARG SOURCE_REVISION=working-tree
+ARG SOURCE_SHA256
+ARG RELEASE_VERSION=0.1.7-beta
+LABEL org.opencontainers.image.title="VLLM-SM75 Ultra" \
+      org.opencontainers.image.version="${RELEASE_VERSION}" \
+      org.opencontainers.image.revision="${SOURCE_REVISION}" \
+      ai.vllm.sm75.release="vllm-sm75-v${RELEASE_VERSION}" \
+      io.sm75.console.sha256="${SOURCE_SHA256}" \
+      io.sm75.console.source-sha256="${SOURCE_SHA256}" \
+      io.sm75.ui.entry="unified-workbench" \
+      io.sm75.release.channel="beta"
+ENV NCCL_P2P_LEVEL=SYS
+RUN node -e 'const fs=require("fs"); if(process.version!=="v22.23.2" || JSON.parse(fs.readFileSync("/opt/harness/node_modules/@deepseek-ai/dsh/package.json")).version!=="0.1.7-alpha.2") throw Error("Use the audited v0.1.6 Ultra runtime");'
+COPY source/console /tmp/sm75-console
+RUN rm -rf /opt/sm75-workbench/console \
+    && mv /tmp/sm75-console /opt/sm75-workbench/console \
+    && mkdir -p /dsh && chmod 755 /dsh \
+    && node /opt/sm75-workbench/console/install-native-plugins.mjs \
+    && node /opt/sm75-workbench/console/verify-client-bundles.mjs
+WORKDIR /opt/sm75-workbench
+ENTRYPOINT ["/usr/local/bin/node", "console/server.mjs"]

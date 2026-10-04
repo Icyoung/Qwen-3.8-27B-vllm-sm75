@@ -1,5 +1,6 @@
+import {mountApiAccess} from './api-access-ui.js';
 // Shared workbench palette, including embedded console and monitoring frames.
-const SM75_UI_BUILD = "20260914-5";
+const SM75_UI_BUILD = "0.1.7-beta-debug-20260930";
 // Asset cache validation is handled by HTTP; never reload a live conversation for a build marker.
 function installWorkbenchTheme() {
   if (globalThis.__sm75ThemeInstalled) return;
@@ -7,11 +8,16 @@ function installWorkbenchTheme() {
   const doc = globalThis.document,
     key = "sm75-color-mode",
     embedded = !!globalThis.__ModuleLoader__;
+  const cachedMode = (() => {
+    try { return localStorage.getItem(key); } catch { return null; }
+  })();
   let mode = embedded
     ? doc.body?.hasAttribute("data-ds-dark-theme")
       ? "dark"
       : "light"
-    : localStorage.getItem(key) || "dark";
+    : globalThis.__SM75_APPEARANCE_SNAPSHOT__?.colorMode || cachedMode || "dark";
+  if (!["light", "dark"].includes(mode)) mode = "dark";
+  const persistMode = () => { try { localStorage.setItem(key, mode); } catch {} };
   const palettes = {
     dark: {
       bg: "#151517",
@@ -126,6 +132,9 @@ function installWorkbenchTheme() {
       .join(" ");
     button.hidden = false;
   }
+  const uiFontFamily = () => getComputedStyle(doc.documentElement)
+    .getPropertyValue("--sm75-ui-font-family").trim()
+    || '-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei UI","Microsoft YaHei","PingFang SC","Hiragino Sans GB","Noto Sans CJK SC","Noto Sans SC",Arial,sans-serif';
   function css(isolatedDocument = false) {
     const p = palettes[mode] || palettes.dark;
     const vars = {
@@ -150,11 +159,25 @@ function installWorkbenchTheme() {
       "bg-color": p.bg,
       "border-color": p.line,
       "card-bg": p.card,
+      "primary-color": p.blue,
+      "success-color": p.mint,
+      "error-color": p.errorText,
+      "info-color": p.blue,
+      "light-bg": p.bg,
+      "dark-bg": p.field2,
+      "dark-row": p.field3,
+      success: p.mint,
+      warning: p.amber,
+      danger: p.errorText,
       "gpu-low": mode === "light" ? "#087f69" : "#58e0bc",
       "gpu-medium": mode === "light" ? "#8a6500" : "#f5d35c",
       "gpu-elevated": mode === "light" ? "#b45309" : "#ffab55",
       "gpu-high": mode === "light" ? "#c62828" : "#ff7373",
     };
+    if (isolatedDocument) {
+      const family = uiFontFamily();
+      Object.assign(vars, { "sm75-ui-font-family": family, "font-sans": family, "font-serif": family });
+    }
     Object.assign(vars, {
       track: p.track,
       line2: p.line2,
@@ -178,45 +201,65 @@ function installWorkbenchTheme() {
         .join(";") +
       "}" +
       (isolatedDocument
-        ? "select,input,textarea{color:var(--ink)!important}"
+        ? "html{background:var(--bg)!important;color:var(--ink)!important}body{font-family:var(--sm75-ui-font-family)!important}select,input,textarea{color:var(--ink)!important}"
         : "@scope (body) to (.dsh-surface, body > :not(aside):not(main):not(script):not(style)) {") +
-      "body{background:var(--bg)!important;color:var(--ink)!important}:host{color:var(--ink)!important}:host button,main button,input,textarea,select,#sm75ThemeToggle{background:var(--field)!important;border-color:var(--line)!important}.card,.profile-card,.hardware-card,.chat-parameter-panel,.message{background:var(--card)!important;color:var(--ink)!important;border-color:var(--line)!important}.message.user{background:var(--field)!important}.chart-tip{background:var(--card)!important;color:var(--ink)!important}body[data-sm75-benchmark]{background:var(--bg)!important;color:var(--ink)!important}body[data-sm75-benchmark] :is(.container,.card,.panel,.config-section,.chart-container,.tab-content,.section,.config-card,#userCodeWidget,table){background:var(--card)!important;color:var(--ink)!important;border-color:var(--line)!important}body[data-sm75-benchmark] :is(h1,h2,h3,h4,label,p,summary){color:var(--ink)!important}body[data-sm75-benchmark] #userCodeWidget *{color:var(--ink)!important}body[data-sm75-benchmark] input,body[data-sm75-benchmark] select{background:var(--field)!important}#sm75ThemeToggle{background:transparent!important;border:0;display:inline-flex;align-items:center;justify-content:center;padding:0;flex-shrink:0}button.primary{background:var(--primary)!important;color:var(--on-primary)!important;border-color:var(--primary)!important}input[role=switch]{background:var(--switch-off)!important}input[role=switch]:checked{background:var(--switch-on)!important}input[role=switch]:before{background:#fff!important}#sm75ThemeToggle[hidden]{display:none!important}#sm75ThemeToggle:hover{background:var(--field)!important}[class*=collapsed] [class*=logoRow]:has(#sm75ThemeToggle){height:auto;flex-wrap:wrap;overflow:visible}" +
+      "body{background:var(--bg)!important;color:var(--ink)!important}:host{color:var(--ink)!important}:host button,main button,input,textarea,select,#sm75ThemeToggle{background:var(--field)!important;border-color:var(--line)!important}.card,.profile-card,.hardware-card,.chat-parameter-panel,.message{background:var(--card)!important;color:var(--ink)!important;border-color:var(--line)!important}.message.user{background:var(--field)!important}.chart-tip{background:var(--card)!important;color:var(--ink)!important}:is(body[data-sm75-benchmark],html[data-sm75-benchmark] body){background:var(--bg)!important;color:var(--ink)!important}:is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) :is(.container,.card,.panel,.config-section,.chart-container,.tab-content,.section,.config-card,#userCodeWidget,#chartContainer,#comparisonChartContainer,.question-card,table){background:var(--card)!important;color:var(--ink)!important;border-color:var(--line)!important}:is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) :is(h1,h2,h3,h4,label,p,summary){color:var(--ink)!important}:is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) #userCodeWidget *{color:var(--ink)!important}:is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) input,:is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) select{background:var(--field)!important}#sm75ThemeToggle{background:transparent!important;border:0;display:inline-flex;align-items:center;justify-content:center;padding:0;flex-shrink:0}button.primary{background:var(--primary)!important;color:var(--on-primary)!important;border-color:var(--primary)!important}input[role=switch]{background:var(--switch-off)!important}input[role=switch]:checked{background:var(--switch-on)!important}input[role=switch]:before{background:#fff!important}#sm75ThemeToggle[hidden]{display:none!important}#sm75ThemeToggle:hover{background:var(--field)!important}[class*=collapsed] [class*=logoRow]:has(#sm75ThemeToggle){height:auto;flex-wrap:wrap;overflow:visible}" +
       (isolatedDocument ? `
         /* These rules belong only to the existing, same-origin test documents.
            Native DSH buttons in the shared page keep their own component theme. */
-        body[data-sm75-benchmark] :is(.api-description,.history-content,.history-modal-content,.modal-content,.batch-upload-content,.result-section,.comparison-section,.notes-panel,.detail-dialog,.detail-section,.history-record){
+        :is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) :is(.api-description,.history-content,.history-modal-content,.modal-content,.batch-upload-content,.result-section,.comparison-section,.notes-panel,.detail-dialog,.detail-section,.history-record){
           background:var(--field2)!important;color:var(--ink)!important;border-color:var(--line)!important
         }
-        body[data-sm75-benchmark] :is(.detail-field-value,.detail-content-block,.detail-concurrent-item){
+        :is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) :is(.detail-field-value,.detail-content-block,.detail-concurrent-item){
           background:var(--card)!important;color:var(--ink)!important;border-color:var(--line)!important
         }
-        body[data-sm75-benchmark] :is(.history-modal-header,.detail-header){
+        :is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) :is(.history-modal-header,.detail-header){
           background:var(--field3)!important;color:var(--ink)!important
         }
-        body[data-sm75-benchmark] :is(.history-modal-close,.history-record-time,.history-record-info,.detail-section-title,.detail-field-label,.detail-block-label,.detail-subsection-title,.detail-concurrent-item-title){
+        :is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) :is(.history-modal-close,.history-record-time,.history-record-info,.detail-section-title,.detail-field-label,.detail-block-label,.detail-subsection-title,.detail-concurrent-item-title){
           color:var(--ink)!important
         }
-        body[data-sm75-benchmark] :is(.api-option,.btn-secondary,.history-btn-secondary,.history-btn-back){
+        :is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) :is(.api-option,.btn-secondary,.history-btn-secondary,.history-btn-back){
           background:var(--field)!important;color:var(--ink)!important;border-color:var(--line)!important
         }
-        body[data-sm75-benchmark] .api-option.active{
+        :is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) .api-option.active{
           background:var(--primary)!important;color:var(--on-primary)!important;border-color:var(--primary)!important
         }
-        body[data-sm75-benchmark] :is(.api-option:hover:not(.active),.btn-secondary:hover:not(:disabled)){
+        :is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) :is(.api-option:hover:not(.active),.btn-secondary:hover:not(:disabled)){
           background:var(--field3)!important
         }
-        body[data-sm75-benchmark] :is(.api-description h3,a){
+        :is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) :is(.api-description h3,a){
           color:var(--blue)!important
         }
-        body[data-sm75-benchmark] :is(.notes,.model-suggest-status,#selectedCount){
+        :is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) :is(.notes,.model-suggest-status,#selectedCount){
           color:var(--muted)!important
         }
-        body[data-sm75-benchmark] :is(.container > div[style*="background: #fffbf0"],[data-sm75-benchmark-notice]){
+        :is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) :is(.container > div[style*="background: #fffbf0"],[data-sm75-benchmark-notice]){
           background:var(--chip-wait-bg)!important;color:var(--amber)!important;border-color:var(--amber)!important
         }
-        body[data-sm75-benchmark] textarea{
+        :is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) textarea{
           background:var(--field)!important;color:var(--ink)!important
         }
+        /* Selectors verified against the pinned speedtest and SQL HTML. */
+        :is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) :is(.sql-box,.concurrent-stats,.log-section,.trace-step,.trace-step-body,.bubble-user,.bubble-assistant,.bubble-tool,.bubble-tool-result,.bubble-tool-error,.thinking-container,.result-table-container,.api-call-body){
+          background:var(--field2)!important;color:var(--ink)!important;border-color:var(--line)!important
+        }
+        :is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) :is(#results th,#results td,.result-table th,.result-table td,.log-line,.dialogue-trace-inner .section-title,.dialogue-trace-inner .diff-report,.dialogue-trace-inner .diff-item,.dialogue-trace-inner .diff-label){
+          color:var(--ink)!important;border-color:var(--line)!important
+        }
+        :is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) :is(#results th,.result-table th){background:var(--field3)!important}
+        :is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) #results tr:nth-child(even){background:var(--field2)!important}
+        :is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) :is(.log-time,.history-empty){color:var(--muted)!important}
+        :is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) :is(.log-info,.log-line.info,.concurrent-stats h3){color:var(--blue)!important}
+        :is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) :is(.log-success,.log-line.success,.concurrent-stats .stat-value,#results .success){color:var(--green)!important}
+        :is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) :is(.log-warning,.log-line.warning){color:var(--amber)!important}
+        :is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) :is(.log-danger,.log-line.danger,#results .error){color:var(--error-text)!important}
+        :is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) :is(.status-pending,.status-skipped){background:var(--field)!important;color:var(--muted)!important}
+        :is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) :is(.progress-container,.matrix-cell.pending){background:var(--track)!important}
+        :is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) .matrix-cell.skipped{background:var(--field)!important;border-color:var(--line)!important}
+        :is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) .question-card:hover{background:var(--field)!important}
+        :is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) .question-card.active{background:var(--active)!important}
+
       ` : "}")
     );
   }
@@ -272,6 +315,7 @@ function installWorkbenchTheme() {
     if (!C?.defaults) return;
     C.defaults.color = palettes[mode].muted;
     C.defaults.borderColor = palettes[mode].line;
+    if (C.defaults.font) C.defaults.font.family = uiFontFamily();
     scaleChartFontOptions(C.defaults);
     for (const c of Object.values(C.instances || {})) {
       const previous = chartThemes.get(c);
@@ -284,8 +328,8 @@ function installWorkbenchTheme() {
         if (axis.grid) axis.grid.color = palettes[mode].line;
       }
       if (c.options?.plugins?.legend?.labels) c.options.plugins.legend.labels.color = palettes[mode].ink;
-      chartThemes.set(c, { mode, scale: fontScale });
       c.update("none");
+      chartThemes.set(c, { mode, scale: fontScale });
     }
   }
   function syncFrameFonts(frame) {
@@ -309,12 +353,20 @@ function installWorkbenchTheme() {
           } });
         }
       }
+      const refresh = () => {
+        if (frame.contentDocument !== child) return;
+        syncFrameFonts(frame);
+        try { syncFrameCharts(win); } catch {}
+      };
       const schedule = () => {
+        // Parser-inserted styles and inline text must scale before their first
+        // paint. Later UI mutations can share the normal short debounce.
+        if (child.readyState === "loading") { refresh(); return; }
         if (state.scheduled) return;
         state.scheduled = true;
         win.setTimeout(() => {
           state.scheduled = false;
-          if (frame.contentDocument === child) { syncFrameFonts(frame); syncFrameCharts(win); }
+          refresh();
         }, 30);
       };
       new win.MutationObserver(records => {
@@ -374,40 +426,48 @@ function installWorkbenchTheme() {
           el.addEventListener("load", apply);
         }
         try {
-          if (el.contentDocument) {
-            if (el.id?.startsWith("benchFrame-")) {
-              el.contentDocument.body?.setAttribute("data-sm75-benchmark", "");
-              if (el.id === "benchFrame-speedtest") {
-                const st = el.contentWindow.localStorage;
-                if (!st.getItem("sm75-benchmark-defaults-20260913")) {
-                  for (const [id, key, v] of [
-                    ["minLength", "MinLength", 512],
-                    ["maxLength", "MaxLength", 131072],
-                    ["step", "Step", 128],
-                    ["stepMultiplier", "StepMultiplier", 2],
-                    ["outputLength", "OutputLength", 512],
-                  ]) {
-                    st.setItem("llmPerfTest" + key, String(v));
-                    const input = el.contentDocument.getElementById(id);
-                    if (input) input.value = v;
-                  }
-                  st.setItem("sm75-benchmark-defaults-20260913", "1");
+          syncFrameAppearance(el);
+          if (el.id === "benchFrame-speedtest") {
+            // Defaults are optional; denied storage must not skip appearance.
+            try {
+              const st = el.contentWindow.localStorage;
+              if (!st.getItem("sm75-benchmark-defaults-20260913")) {
+                for (const [id, key, value] of [
+                  ["minLength", "MinLength", 512], ["maxLength", "MaxLength", 131072],
+                  ["step", "Step", 128], ["stepMultiplier", "StepMultiplier", 2], ["outputLength", "OutputLength", 512],
+                ]) {
+                  st.setItem("llmPerfTest" + key, String(value));
+                  const input = el.contentDocument.getElementById(id);
+                  if (input) input.value = value;
                 }
+                st.setItem("sm75-benchmark-defaults-20260913", "1");
               }
-
-            }
-            syncFrameFonts(el);
-            syncFrameCharts(el.contentWindow);
-            scan(el.contentDocument);
-            el.contentWindow.postMessage(
-              { type: "sm75-theme", mode },
-              location.origin,
-            );
+            } catch {}
           }
         } catch {}
       }
     }
   }
+  function syncFrameAppearance(frame) {
+    const child = frame.contentDocument, win = frame.contentWindow;
+    if (!child?.documentElement || !win) return;
+    if (frame.id?.startsWith("benchFrame-")) {
+      child.documentElement.setAttribute("data-sm75-benchmark", "");
+      child.body?.setAttribute("data-sm75-benchmark", "");
+    }
+    // Theme first: chart failures or optional stored defaults cannot leave a
+    // partially styled document. This also works from the child's head script.
+    scan(child);
+    syncFrameFonts(frame);
+    try { syncFrameCharts(win); } catch {}
+    win.postMessage({ type: "sm75-theme", mode }, location.origin);
+  }
+  globalThis.__sm75InitializeFrameAppearance = frame => {
+    if (frame?.ownerDocument !== doc || !(frame.id === "monitorFrame" || frame.id?.startsWith("benchFrame-"))) return;
+    fontScale = readFontScale();
+    if (!lastCss) { lastCss = css(); lastFrameCss = css(true); }
+    syncFrameAppearance(frame);
+  };
   let announcedMode;
   function apply() {
     fontScale = readFontScale();
@@ -440,25 +500,25 @@ function installWorkbenchTheme() {
       return;
     }
     mode = mode === "dark" ? "light" : "dark";
-    localStorage.setItem(key, mode);
+    persistMode();
     apply();
   };
   doc.addEventListener("sm75-set-theme", (e) => {
     if (embedded || !["light", "dark"].includes(e.detail) || mode === e.detail) return;
     mode = e.detail;
-    localStorage.setItem(key, mode);
+    persistMode();
     apply();
   });
   window.addEventListener("storage", (e) => {
     if (e.key === key) {
-      mode = e.newValue || "dark";
+      mode = ["light", "dark"].includes(e.newValue) ? e.newValue : "dark";
       apply();
     }
   });
   doc.addEventListener("sm75-toggle-local", () => {
     if (embedded) return;
     mode = mode === "dark" ? "light" : "dark";
-    localStorage.setItem(key, mode);
+    persistMode();
     apply();
   });
   if (embedded)
@@ -719,7 +779,22 @@ export function mountConsole(document = globalThis.document, options = {}) {
       }
     };
   }
-  let editorBase = null;
+  let editorBase = null, editorOrigin = 'profiles', modelLaunchId = null, runningProfile = null, savingProfile = false, modelSourceGeneration = 0;
+  let editorTab = 'basic';
+  function selectEditorTab(id) {
+    editorTab = id;
+    $('profileEditor').querySelector('.context-cache-grid').hidden = id !== 'cache';
+    for (const button of document.querySelectorAll('[data-editor-tab]')) button.setAttribute('aria-selected',String(button.dataset.editorTab === id));
+    const groups = {modelSettings:'basic',quickConfiguration:'acceleration',contextSettings:'cache',lmcacheSettings:'cache',powerSettings:'power',advancedParameters:'advanced'};
+    for (const [key, tab] of Object.entries(groups)) {$(key).hidden = tab !== id; if ($(key).tagName === 'DETAILS') $(key).open = true;}
+    for (const node of $('profileEditor').querySelectorAll(':scope > details:not([id])')) node.hidden = id !== 'advanced';
+    // Resource inputs share the existing parameter renderer; move its resource group into the basic tab.
+    const resources = $('parameterFields').querySelector('details');
+    if (resources && resources.querySelector('summary')?.textContent.includes('模型与资源')) {
+      resources.dataset.resourceGroup = 'true'; resources.open = true; $('modelSettings').append(resources);
+    }
+  }
+  for (const button of document.querySelectorAll('[data-editor-tab]')) button.onclick = () => selectEditorTab(button.dataset.editorTab);
   let globalSettings = {},
     catalog = [],
     profileState = {},
@@ -750,6 +825,8 @@ export function mountConsole(document = globalThis.document, options = {}) {
     authGeneration = 0,
     authEpoch = 0,
     authTask = null,
+    workspaceLoaded = false,
+    workspaceLoadTask = null,
     disposed = false,
     refreshing = false;
   const stopLiveSummary = mountLiveSummary($("liveSummary"), {
@@ -778,9 +855,18 @@ export function mountConsole(document = globalThis.document, options = {}) {
     const toolbar = $("workspaceToolbar");
     const scale = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--ui-fs")) || 1;
     const gap = Number.parseFloat(getComputedStyle(header).gap) || 0;
-    const leading = Math.max(224, Number.parseFloat(getComputedStyle(toolbar).minWidth) || 0);
-    const required = leading + 96 + $("liveSummary").getBoundingClientRect().width
-      + 30 + 30 + (20 + 20.5 * scale) + gap * 6;
+    // Use one budget on every page; a workbench title may shrink inside its own
+    // slot, while the status and metric slots always retain their full widths.
+    const leading = Math.max(160 * scale, Number.parseFloat(getComputedStyle(toolbar).minWidth) || 0);
+    const minimum = node => Math.max(node.getBoundingClientRect().width,
+      Number.parseFloat(getComputedStyle(node).minWidth) || 0);
+    const fixedControls = [$("sm75P8"), $("monitorLogs")];
+    // Reserve both action slots on every page, including while hidden, so
+    // moving to monitoring cannot relocate the profile selector.
+    const controls = fixedControls.reduce((width, node) => width + Math.max(30 * scale, minimum(node)), 0);
+    const required = leading + 96 * scale + $("liveSummary").getBoundingClientRect().width
+      + controls + minimum($("signout")) + Math.max(46 * scale, minimum($("taskToggle")))
+      + gap * (5 + fixedControls.length);
     const compact = required > header.clientWidth;
     if (header.dataset.auxInSidebar === String(compact)) return;
     header.dataset.auxInSidebar = String(compact);
@@ -890,6 +976,8 @@ export function mountConsole(document = globalThis.document, options = {}) {
     $("login").hidden = allowed || state === "checking";
     $("authPending").hidden = state !== "checking";
     if (!allowed) {
+      workspaceLoaded = false;
+      workspaceLoadTask = null;
       for (const id of ["adminCurrentPassword", "adminPassword", "adminPasswordConfirm"]) $(id).value = "";
       for (const section of shell.querySelectorAll(":scope>section"))
         if (section.id !== "login") section.hidden = true;
@@ -976,7 +1064,17 @@ export function mountConsole(document = globalThis.document, options = {}) {
   async function enterWorkspace() {
     if (disposed) return;
     setAuth("authenticated");
-    await load();
+    if (workspaceLoaded) return;
+    if (workspaceLoadTask) return workspaceLoadTask;
+    const epoch = authEpoch, generation = authGeneration;
+    const task = (async () => {
+      await load();
+      if (!disposed && authState === "authenticated" && epoch === authEpoch && generation === authGeneration)
+        workspaceLoaded = true;
+    })();
+    workspaceLoadTask = task;
+    try {await task;}
+    finally {if (workspaceLoadTask === task) workspaceLoadTask = null;}
   }
   function checkSession() {
     if (authTask) return authTask;
@@ -992,7 +1090,7 @@ export function mountConsole(document = globalThis.document, options = {}) {
         if (disposed || generation !== authGeneration) return;
         syncLoginMode(d.accountConfigured);
         if (!d.authenticated) setAuth("anonymous");
-        else if (authState !== "authenticated") await enterWorkspace();
+        else if (authState !== "authenticated" || !workspaceLoaded) await enterWorkspace();
       } catch (e) {
         if (!disposed && generation === authGeneration) {
           if (authState !== "authenticated") setAuth("unavailable", e.message);
@@ -1019,15 +1117,23 @@ export function mountConsole(document = globalThis.document, options = {}) {
   globalThis.addEventListener("pageshow", onRestore);
   globalThis.addEventListener("focus", onRestore);
   let navigationGeneration = 0;
+  let pendingNavigation = 0;
   const nativeRoutes = new Set(["harness", "usage", "plugins"]);
   const nativePanelIds = {usage:"sm75-usage", plugins:"plugins"};
-  const onNativeNavigate = () => {void page("harness").catch(report);};
+  const onNativeNavigate = event => {void page(event.detail?.page || "harness").catch(report);};
+  const onNativePanel = event => {
+    if (event.detail?.initial || pendingNavigation || !nativeRoutes.has(current)) return;
+    const id = event.detail?.id === null ? "harness"
+      : Object.entries(nativePanelIds).find(([, panel]) => panel === event.detail?.id)?.[0];
+    if (id && id !== current) commitPage(id, {record:true});
+  };
   const onNativeSettings = event => {
     selectSettingsTab(event.detail?.id || "connections");
     void page("settings").catch(report);
   };
   document.addEventListener("sm75-native-navigate", onNativeNavigate);
   document.addEventListener("sm75-native-settings", onNativeSettings);
+  document.addEventListener("sm75-native-panel", onNativePanel);
   function route(action) {
     if (!active) throw Error("请先选择运行配置");
     return "/console-api/profiles/" + active + "/" + action;
@@ -1037,7 +1143,9 @@ export function mountConsole(document = globalThis.document, options = {}) {
     if (id === "benchmarks") id = "tests";
     if (!Object.hasOwn(routeTitles, id)) id = "profiles";
     const navigation = ++navigationGeneration;
-    if (id !== current && current === "profiles" && !(await resolveDraft())) {
+    pendingNavigation = navigation;
+    try {
+    if (id !== current && !$("profileEditor").hidden && !(await resolveDraft())) {
       if (!options.embedded) history.replaceState(null, "", "/?page=" + current);
       return;
     }
@@ -1072,6 +1180,12 @@ export function mountConsole(document = globalThis.document, options = {}) {
       $("notice").textContent = "";
     }
     if (navigation !== navigationGeneration) return;
+    commitPage(id, {record});
+    } finally {
+      if (pendingNavigation === navigation) pendingNavigation = 0;
+    }
+  }
+  function commitPage(id, {record = true} = {}) {
     current = id;
     shell.dataset.page = id;
     document.dispatchEvent(new CustomEvent("sm75-route-change", {detail:{page:id}}));
@@ -1081,6 +1195,7 @@ export function mountConsole(document = globalThis.document, options = {}) {
     shell.classList.toggle("monitor-page", id === "monitor");
     $("monitorLogs").hidden = id !== "monitor";
     $("monitorControls").hidden = id !== "monitor";
+    if (id === "monitor") refreshHardware().catch(report);
     if (id === "tests") refreshBenchmarks().catch(report);
     if (id === "chat") loadChatControls().catch(report);
     if (id === "profiles") refreshProfileCards().catch(report);
@@ -1093,6 +1208,7 @@ export function mountConsole(document = globalThis.document, options = {}) {
     $("title").hidden = id === "harness" && !!globalThis.__SM75_WORKBENCH__?.ready;
     $("workspaceToolbar").hidden = id !== "harness";
     $("workspaceSidebar").hidden = id !== "harness";
+    $("nativePluginSettingsSurface").hidden = id !== "plugins";
     shell.classList.toggle("workspace-page", nativeRoutes.has(id));
     for (const button of document.querySelectorAll("#nav button"))
       button.classList.toggle("active", button.dataset.page === id);
@@ -1104,13 +1220,33 @@ export function mountConsole(document = globalThis.document, options = {}) {
     }
   }
   for (const button of document.querySelectorAll("[data-page]"))
-    button.onclick = run(() => page(button.dataset.page));
+    button.onclick = run(async () => {
+      await page(button.dataset.page);
+      if (button.dataset.page === "harness") document.dispatchEvent(new Event("sm75-workspace-reset-search"));
+    });
 
+  const apiAccessSettings = mountApiAccess($('apiAccessSettings'),{api});
+  const apiAccessDialog = mountApiAccess($('apiAccessDialogBody'),{api});
+  for (const button of document.querySelectorAll('[data-open-api-access]')) button.onclick = run(async()=>{
+    $('apiAccessDialog').showModal();
+    await apiAccessDialog.load();
+  });
+  $('closeApiAccess').onclick=()=>$('apiAccessDialog').close();
+  $('apiAccessDialog').addEventListener('close',()=>apiAccessDialog.clear());
   let settingsTab = "deployment";
   let settingsGeneration = 0;
   const nativeSettingsTabs = new Set(["appearance", "assistant", "connections"]);
+  const settingsHints = {
+      appearance: "主题和字号调整后立即保存。",
+      assistant: "默认助手选择立即保存；其他配置使用对应的保存操作。",
+      connections: "连接配置在对应表单中校验并保存。",
+      sampling: "保存后用于后续请求；当前会话正在生成的内容不受影响。",
+      deployment: "目录与默认启动配置保存后生效；正在运行的模型保持原配置。",
+      security: "账号与访问网段分别保存；修改已有配置需验证当前密码。",
+    };
   function selectSettingsTab(id) {
     const allowed = new Set(["appearance", "assistant", "connections", "sampling", "deployment", "security"]);
+    apiAccessSettings.clear();
     settingsTab = allowed.has(id) ? id : "deployment";
     ++settingsGeneration;
     for (const button of document.querySelectorAll("[data-settings-tab]")) {
@@ -1123,22 +1259,17 @@ export function mountConsole(document = globalThis.document, options = {}) {
       panel.hidden = panel.dataset.settingsPanel !== settingsTab;
     $("nativeSettingsSurface").hidden = !nativeSettingsTabs.has(settingsTab);
     $("saveUnifiedSettings").hidden = !["deployment", "sampling"].includes(settingsTab);
-    $("settingsSaveHint").textContent = {
-      appearance: "主题和字号调整后立即保存。",
-      assistant: "默认助手选择立即保存；其他配置使用对应的保存操作。",
-      connections: "连接配置在对应表单中校验并保存。",
-      sampling: "保存后用于后续请求；当前会话正在生成的内容不受影响。",
-      deployment: "目录与默认启动配置保存后生效；正在运行的模型保持原配置。",
-      security: "账号与访问网段分别保存；修改已有配置需验证当前密码。",
-    }[settingsTab];
+    $("settingsSaveHint").textContent = settingsHints[settingsTab];
     try { localStorage.setItem("sm75-settings-tab", settingsTab); } catch {}
     if (current === "settings" && authState === "authenticated") activateSettingsTab().catch(report);
   }
   async function activateSettingsTab() {
     const generation = settingsGeneration;
+    if (settingsTab === "connections") await apiAccessSettings.load();
+    if (current !== "settings" || generation !== settingsGeneration) return;
     const native = nativeSettingsTabs.has(settingsTab);
     if (!native) {globalThis.__SM75_WORKBENCH__?.selectSettings(null); return;}
-    const hint=$("settingsSaveHint").textContent;
+    const hint=settingsHints[settingsTab];
     if(!globalThis.__SM75_WORKBENCH__?.ready)
       $("settingsSaveHint").textContent="正在加载工作台设置…";
     try {
@@ -1233,10 +1364,12 @@ export function mountConsole(document = globalThis.document, options = {}) {
       : profiles[0]?.id || "";
     $("active").value = active;
     $("active").title = profiles.find(p => p.id === active)?.name || "当前运行配置";
-    fillProfile();
+    if ($("profileEditor").hidden) fillProfile();
     $("login").hidden = true;
-    await page(current, { record: false });
-    if (active && !options.headerOnly) void openHarness().catch(() => {});
+    // A save performed by the unsaved-draft dialog must not invalidate the
+    // navigation that is waiting for that save to complete.
+    if (!pendingNavigation) await page(current, { record: false });
+    if (!options.headerOnly) void openHarness().catch(() => {});
     await loadChat();
     await refresh();
   }
@@ -1321,10 +1454,11 @@ export function mountConsole(document = globalThis.document, options = {}) {
   const onPop = () =>
     page(new URLSearchParams(location.search).get("page") || "profiles", {
       record: false,
-    });
+    }).catch(report);
   if (!options.embedded) globalThis.addEventListener("popstate", onPop);
   $("active").onchange = run(async () => {
     const selected = $("active").value;
+    if (runningProfile) { $('active').value = runningProfile; throw Error('切换模型请到模型库选择配置并启动'); }
     if (!(await resolveDraft())) {
       $("active").value = active;
     $("active").title = profiles.find(p => p.id === active)?.name || "当前运行配置";
@@ -1349,6 +1483,14 @@ export function mountConsole(document = globalThis.document, options = {}) {
     if (current === "profiles") await refreshProfileCards();
     if (current === "models") await refreshModels();
     if (current === "tests") await refreshBenchmarks();
+    const runtime = await api('/console-api/runtime');
+    runningProfile = runtime.phase === 'ready' ? runtime.profile : null;
+    $('active').disabled = !!runtime.profile;
+    if (runningProfile && active !== runningProfile) {
+      active = runningProfile; $('active').value = active;
+      $('active').title = profiles.find(p => p.id === active)?.name || '当前运行配置';
+    }
+    $('saveAndStart').textContent = runningProfile ? '保存并切换' : '保存并启动';
     const sys = await api("/console-api/system");
     $("gpu").replaceChildren(
       ...sys.gpus.map((g) => {
@@ -1371,7 +1513,7 @@ export function mountConsole(document = globalThis.document, options = {}) {
     );
     if (active) {
       const st = await api(route("status"));
-      $("state").textContent = st.running ? "模型进程运行" : "未运行";
+      $("state").textContent = runtime.phase === 'starting' ? '正在加载：'+(profiles.find(p=>p.id===runtime.profile)?.name || runtime.profile) : st.running ? '模型进程运行' : '未运行';
       if ($("sm75P8"))
         $("sm75P8").hidden = !(
           st.running &&
@@ -1526,28 +1668,41 @@ export function mountConsole(document = globalThis.document, options = {}) {
     logsRender();
   };
   $("logDialog").addEventListener("close", stopLogs);
-  $("save").onclick = run(async () => {
+  async function saveEdited(start = false) {
+    if (savingProfile) return;
+    savingProfile = true;
+    $('save').disabled = $('saveAndStart').disabled = true;
+    try {
     const snapshot = editedProfile();
-    profiles = await api("/console-api/profiles", snapshot);
-    active = snapshot.id;
-    if ($("profileDefault").checked) {
-      globalSettings = await api("/console-api/settings", {
-        defaultProfile: active,
-        autoStart: true,
-      });
-    } else if (globalSettings.defaultProfile === active) {
-      globalSettings = await api("/console-api/settings", {
-        defaultProfile: "",
-        autoStart: false,
-      });
-    }
+    if (start) await api('/console-api/profiles/validate',snapshot);
+    profiles = await api('/console-api/profiles',snapshot);
+    editorBase = structuredClone(snapshot);
+    if ($('profileDefault').checked) globalSettings = await api('/console-api/settings',{defaultProfile:snapshot.id,autoStart:true});
+    else if (globalSettings.defaultProfile === snapshot.id) globalSettings = await api('/console-api/settings',{defaultProfile:'',autoStart:false});
     editorDirty = false;
-    // Complete refresh before exposing the cards, so an immediate reopen cannot
-    // restore an old profile while load() is still replacing the editor values.
     await load();
-    closeEditor();
-    await refreshProfileCards();
-  });
+    $('notice').textContent = '配置已保存。';
+    if (start) await launchProfile(snapshot.id);
+    else if (editorOrigin === 'profiles') {closeEditor(); await refreshProfileCards();}
+    } finally {
+      savingProfile = false;
+      $('save').disabled = $('saveAndStart').disabled = false;
+    }
+  }
+  async function launchProfile(id) {
+    if (abort) throw Error('快速会话仍在生成，请先结束本次回复');
+    $('notice').textContent = '正在校验并启动模型，可在任务状态中查看进度…';
+    $('saveAndStart').disabled = true;
+    try {
+      const result = await api('/console-api/profiles/'+id+'/start',{});
+      active = id; $('active').value = id;
+      $('active').title = profiles.find(p => p.id === id)?.name || '当前运行配置';
+      await loadChat(); await refresh();
+      $('notice').textContent = result.warning || '模型已就绪。';
+    } finally { $('saveAndStart').disabled = false; }
+  }
+  $('save').onclick = run(() => saveEdited());
+  $('saveAndStart').onclick = run(() => saveEdited(true));
   $("applyParams").onclick = run(() => {
     const args = contextArgsForModel($("modelPath").value);
     function put(k, v) {
@@ -2167,7 +2322,6 @@ export function mountConsole(document = globalThis.document, options = {}) {
       $("root").hidden=false;
       harnessBoot=(async()=>{
         const profile = await resolveHarnessProfile();
-        if (!profile) throw Error("请先创建运行配置");
         const data=await api("/console-api/harness/start",{profile});
         await loadNativeWorkbench(data.url);
         $("harnessState").hidden=true;
@@ -2270,27 +2424,9 @@ export function mountConsole(document = globalThis.document, options = {}) {
           " · " +
           (m.role === "draft" ? "草稿模型" : m.modelType || "本地模型");
         select.setAttribute("aria-label", m.name + " 配置模板");
-        const suitable = profiles.filter((p) => p.format === m.format);
-        select.add(new Option("选择运行配置模板", ""));
-        for (const p of suitable) select.add(new Option(profileLabel(p), p.id));
-        for (const t of templateData.personal.filter(
-          (t) => t.profile.format === m.format,
-        ))
-          select.add(new Option(t.name, "personal:" + t.id));
-        button.textContent = "配置并使用";
-        button.disabled = m.role === "draft";
-        button.onclick = run(async () => {
-          if (!select.value) throw Error("请选择适用的运行配置模板");
-          const d = await api("/console-api/models/use", {
-            model: m.id,
-            template: select.value,
-            start: false,
-          });
-          active = d.profile;
-          await load();
-          page("profiles");
-          $("notice").textContent = "已创建配置，请确认参数后启动。";
-        });
+        button.textContent = '配置并启动';
+        button.disabled = m.role === 'draft';
+        button.onclick = run(() => openModelLaunch(m));
         const details = document.createElement("details"),
           summary = document.createElement("summary"),
           path = document.createElement("p");
@@ -2298,7 +2434,7 @@ export function mountConsole(document = globalThis.document, options = {}) {
         path.textContent = m.path;
         details.append(summary, path);
         row.append(label, info);
-        if (m.role !== "draft") row.append(select, button);
+        if (m.role !== "draft") row.append(button);
         const remove = document.createElement("button");
         remove.textContent = "删除模型";
         remove.className = "danger";
@@ -2354,8 +2490,8 @@ export function mountConsole(document = globalThis.document, options = {}) {
         source.args.some((x) => typeof x !== "string" || x.includes("\0"))
       )
         throw Error("配置需要包含模型及字符串参数数组 args");
-      if (!["fp8", "awq", "kat"].includes(source.format))
-        throw Error("权重格式应为 fp8、awq 或 kat");
+      if (!["fp8", "awq", "kat", "fp16", "bf16", "int8", "gptq", "nvfp4", "custom"].includes(source.format))
+        throw Error("不支持的权重格式分类");
       if (
         source.args.some((x) => x === "--api-key" || x.startsWith("--api-key="))
       )
@@ -2457,15 +2593,16 @@ export function mountConsole(document = globalThis.document, options = {}) {
       ? "完整配置已导出（不含 API Key）。"
       : "完整配置已复制（不含 API Key）。";
   }
-  $("saveApiKey").onclick = run(async () => {
-    await api("/console-api/api-access", { key: $("modelApiKey").value });
-    $("modelApiKey").value = "";
-    $("apiKeyStatus").textContent = "API Key 已保存，下次启动模型生效。";
-  });
   function closeEditor() {
+    modelSourceGeneration++;
+    setModelSourceLoading(false);
     const editor = $("profileEditor");
     editor.hidden = true;
     $("profiles").append(editor);
+    $('modelLaunch').hidden = true;
+    $('localModelsTab').parentElement.hidden = false;
+    $('localModelsView').hidden = false;
+    editorOrigin = 'profiles'; modelLaunchId = null; editorDirty = false; $('backProfiles').hidden = false;
     for (const c of document.querySelectorAll(".profile-card.editing"))
       c.classList.remove("editing");
     document.querySelector(".import-draft")?.remove();
@@ -2473,12 +2610,11 @@ export function mountConsole(document = globalThis.document, options = {}) {
   }
   async function editProfile(p, copy = false, imported = false) {
     if (!(await resolveDraft())) return;
+    modelSourceGeneration++;
+    setModelSourceLoading(false);
     editorDirty = false;
-    if (!imported) {
-      active = p.id;
-      $("active").value = active;
-    $("active").title = profiles.find(p => p.id === active)?.name || "当前运行配置";
-    }
+    editorOrigin = 'profiles';
+    $('profiles').append($('profileEditor'));
     fillProfile(p);
     featureBackup = {};
     if (copy) {
@@ -2512,10 +2648,11 @@ export function mountConsole(document = globalThis.document, options = {}) {
       $("profileEditor").scrollIntoView({ behavior: "smooth", block: "start" }),
     );
     syncFeatures();
+    selectEditorTab('basic');
     page("profiles");
   }
   async function refreshProfileCards() {
-    if (!$("profileEditor").hidden) return;
+    if (!$("profileEditor").hidden && editorOrigin === 'profiles') return;
     const states = await Promise.all(
       profiles.map(async (p) => [
         p.id,
@@ -2524,7 +2661,7 @@ export function mountConsole(document = globalThis.document, options = {}) {
     );
     // A user may reopen the editor while the status requests are in flight.
     // Replacing its parent card now would detach the live form.
-    if (!$("profileEditor").hidden) return;
+    if (!$("profileEditor").hidden && editorOrigin === 'profiles') return;
     profileState = Object.fromEntries(states);
     const signature = JSON.stringify([profiles, profileState]);
     if (signature === profilesSignature) return;
@@ -2575,13 +2712,8 @@ export function mountConsole(document = globalThis.document, options = {}) {
           [
             profileState[p.id]?.running ? "停止" : "启动",
             async () => {
-              await api(
-                "/console-api/profiles/" +
-                  p.id +
-                  "/" +
-                  (profileState[p.id]?.running ? "stop" : "start"),
-                {},
-              );
+              if (profileState[p.id]?.running) await api('/console-api/profiles/'+p.id+'/stop',{});
+              else await launchProfile(p.id);
               await refreshProfileCards();
             },
           ],
@@ -2603,11 +2735,60 @@ export function mountConsole(document = globalThis.document, options = {}) {
   $("backProfiles").onclick = async () => {
     if (await resolveDraft()) closeEditor();
   };
-  $("createProfile").onclick = run(() => {
-    const p = profiles.find((p) => p.id === active) || profiles[0];
-    if (!p) throw Error("请先导入基础配置");
-    editProfile(p, true);
+  $('createProfile').onclick = run(async () => {
+    if (!(await resolveDraft())) return;
+    closeEditor(); await page('models');
+    $('notice').textContent = '请选择模型，再选择模板或自定义配置。';
   });
+  function populateModelSources() {
+    const kind = $('modelSourceKind').value, select = $('modelSourceTemplate');
+    $('modelSourceLabel').hidden = kind === 'custom';
+    const choices = kind === 'saved' ? [...profiles.map(p=>[profileLabel(p),p.id]),...templateData.personal.map(t=>[t.name,'personal:'+t.id])]
+      : [['默认','base:default'],['单人长上下文','base:single-long'],['多人并发','base:multi-user'],['Coding','base:coding'],...templateData.recommended.filter(t=>t.modelProfile).map(t=>[t.name,'base:'+t.id])];
+    select.replaceChildren(...choices.map(([label,value])=>new Option(label,value)));
+    if (kind === 'saved' && !choices.length) select.add(new Option('暂无已保存配置，可选择自定义',''));
+  }
+  function setModelSourceLoading(loading) {
+    $('profileEditor').inert = loading;
+    for (const id of ['modelSourceKind', 'modelSourceTemplate', 'loadModelSource']) $(id).disabled = loading;
+  }
+  async function loadModelSource() {
+    const template = $('modelSourceKind').value === 'custom' ? 'custom' : $('modelSourceTemplate').value;
+    if (!template) throw Error('请选择模板，或使用自定义配置');
+    const generation = ++modelSourceGeneration, model = modelLaunchId;
+    setModelSourceLoading(true);
+    $('modelDraftNotice').textContent = '正在载入配置…';
+    try {
+      const result = await api('/console-api/models/draft',{model,template});
+      if (generation !== modelSourceGeneration || editorOrigin !== 'models' || modelLaunchId !== model) return false;
+      fillProfile(result.profile); syncFeatures(); selectEditorTab(editorTab);
+      $('profileDefault').checked = false; editorDirty = false;
+      $('profileEditor').hidden = false;
+      $('modelDraftNotice').textContent = result.notices.join(' ') || '调整参数后保存或启动；当前运行模型保持不变。';
+      return true;
+    } catch (error) {
+      if (generation === modelSourceGeneration) $('modelDraftNotice').textContent = '配置载入失败，请重试。';
+      throw error;
+    } finally {
+      if (generation === modelSourceGeneration) setModelSourceLoading(false);
+    }
+  }
+  async function openModelLaunch(model) {
+    if (!(await resolveDraft())) return;
+    closeEditor(); editorOrigin = 'models'; modelLaunchId = model.id; $('backProfiles').hidden = true;
+    $('modelSourceKind').value = 'base'; populateModelSources();
+    $('launchModelTitle').textContent = model.name;
+    await page('models');
+    $('localModelsView').hidden = true; $('downloadModelsView').hidden = true;
+    $('modelLaunch').hidden = false;
+    $('localModelsTab').parentElement.hidden = true;
+    $('modelEditorMount').append($('profileEditor'));
+    $('modelDraftNotice').textContent = '正在准备模型配置…';
+    editorTab = 'basic'; await loadModelSource();
+  }
+  $('modelSourceKind').onchange = populateModelSources;
+  $('loadModelSource').onclick = run(async () => {if (await resolveDraft()) await loadModelSource();});
+  $('backModels').onclick = async () => {if (await resolveDraft()) closeEditor();};
   $("localModelsTab").onclick = () => {
     $("localModelsView").hidden = false;
     $("downloadModelsView").hidden = true;
@@ -2673,16 +2854,24 @@ export function mountConsole(document = globalThis.document, options = {}) {
     return retargetContextModel(JSON.parse($("args").value), modelPath,
       catalog.find(model => model.path === modelPath)?.context || {});
   }
-  $("mainModelSelect").onchange = run(() => {
-    const previousModel = JSON.parse($("args").value)[0];
+  $('mainModelSelect').onchange = run(async () => {
+    const before = editedProfile(), model = catalog.find(m=>m.path === $('mainModelSelect').value);
+    const generation = ++modelSourceGeneration, origin = editorOrigin;
+    if (!model || model.path === before.args[0]) {setModelSourceLoading(false); return;}
+    const current = () => generation === modelSourceGeneration && editorOrigin === origin && !$('profileEditor').hidden;
+    setModelSourceLoading(true);
     try {
-      $("args").value = JSON.stringify(contextArgsForModel($("mainModelSelect").value));
-      contextEditor.refresh(true);
-      renderParameters();
-      fillCombo();
-    } catch (error) {
-      $("mainModelSelect").value = previousModel;
-      throw error;
+      const result = await api('/console-api/models/draft',{model:model.id,source:before});
+      if (!current()) return;
+      fillProfile({...result.profile,id:before.id,name:before.name});
+      syncFeatures(); selectEditorTab(editorTab); editorDirty = true;
+      $('notice').textContent = result.notices.join(' ');
+      if (editorOrigin === 'models') {modelLaunchId=model.id;$('launchModelTitle').textContent=model.name;}
+    } catch(error) {
+      if (!current()) return;
+      $('mainModelSelect').value=before.args[0]; throw error;
+    } finally {
+      if (generation === modelSourceGeneration) setModelSourceLoading(false);
     }
   });
   $("chooseMtp").onclick = () => {
@@ -2890,7 +3079,7 @@ export function mountConsole(document = globalThis.document, options = {}) {
       put("--scheduler-cls", COMBO_SCHED);
     }
     $("args").value = JSON.stringify(args, null, 2);
-    $("format").value = m.format === "fp8" ? "fp8" : "awq";
+    $("format").value = m.format;
     contextEditor.refresh(true);
     renderParameters();
     syncFeatures();
@@ -2972,6 +3161,11 @@ export function mountConsole(document = globalThis.document, options = {}) {
     $("notice").textContent = "网段白名单已保存。";
   });
   async function loadSettings(s) {
+    const imported = s.runtimeEnvironment;
+    $("runtimeEnvironmentHint").hidden = !imported;
+    $("runtimeEnvironmentHint").textContent = imported?.state === "failed"
+      ? "Docker 启动参数未生效：" + imported.error
+      : imported ? "已从 Docker 载入默认运行配置；面板修改会在下次模型启动时使用。容器重启会重新读取 Docker 参数。" : "";
     showSecurity(await api("/console-api/security"));
     await refreshSampling();
     $("provider").value = s.source;
@@ -2985,7 +3179,7 @@ export function mountConsole(document = globalThis.document, options = {}) {
     $("autoStart").checked = s.autoStart;
     templateData = await api("/console-api/templates");
     $("templateSelect").replaceChildren(
-      ...templateData.recommended.map(
+      ...templateData.recommended.filter(t=>!t.modelProfile).map(
         (t) => new Option(t.name, "base:" + t.id),
       ),
       ...templateData.personal.map(
@@ -3028,7 +3222,7 @@ export function mountConsole(document = globalThis.document, options = {}) {
         low: Number($("pstateLow").value),
         high: Number($("pstateHigh").value),
         poll: Number($("pstatePoll").value) || 5,
-        gpus: "0,1,2,3",
+        gpus: editorBase?.power?.gpus || '0',
       },
     });
   }
@@ -3056,19 +3250,16 @@ export function mountConsole(document = globalThis.document, options = {}) {
         2,
       );
     } else {
-      const p = templateData.personal.find((t) => t.id === id).profile;
-      editorBase = structuredClone(p);
-      $("args").value = JSON.stringify(p.args, null, 2);
-      $("binds").value = JSON.stringify(p.binds || [], null, 2);
-      $("cacheRoot").value = globalSettings.cacheRoot || p.cacheRoot;
-      $("format").value = p.format;
-      fillProfilePowerFields(document, p);
-      syncPower();
+      const target = editedProfile(), model = catalog.find(m=>m.path === target.args[0]);
+      if (!model) throw Error('请先从模型库选择目标模型');
+      const result = await api('/console-api/models/draft',{model:model.id,template:'personal:'+id});
+      fillProfile({...result.profile,id:target.id,name:target.name});
+      $('notice').textContent = result.notices.join(' ');
     }
     contextEditor.refresh(true);
     lmcacheEditor.refresh(true);
     renderParameters();
-    page("profiles");
+    selectEditorTab(editorTab); editorDirty = true;
     $("notice").textContent = "模板已填入，请检查并保存运行配置。";
   });
 
@@ -3302,7 +3493,7 @@ export function mountConsole(document = globalThis.document, options = {}) {
     });
     box.replaceChildren(...cards);
     $("hardwareStamp").textContent =
-      "每 5 秒更新 · " + new Date(data.time * 1000).toLocaleTimeString();
+      data.unavailableReason || "每 5 秒更新 · " + new Date(data.time * 1000).toLocaleTimeString();
   }
   $("p2pCapability").onclick = run(async () => {
     const button = $("p2pCapability");
@@ -3311,7 +3502,7 @@ export function mountConsole(document = globalThis.document, options = {}) {
     try {
       const d = await api("/console-api/hardware?p2p=1");
       $("p2pResult").textContent =
-        d.p2p.length === 0
+        d.unavailableReason ? d.unavailableReason : d.p2p.length === 0
           ? "P2P 无法判定：至少需要两张 GPU"
           : d.p2p.some((p) => p.read === null || p.write === null)
             ? "P2P 无法判定"
@@ -3442,6 +3633,7 @@ export function mountConsole(document = globalThis.document, options = {}) {
     return { model: args[0] || "", rows };
   }
   function renderParameters() {
+    $('modelSettings').querySelector('[data-resource-group]')?.remove();
     const state = readParamRows(),
       box = $("parameterFields");
     const specRow = state.rows.find((r) => r.key === "--speculative-config");
@@ -3785,6 +3977,7 @@ export function mountConsole(document = globalThis.document, options = {}) {
     syncFeatures();
     contextEditor.refresh();
     lmcacheEditor.refresh();
+    selectEditorTab(editorTab);
   }
   $("addParameter").onclick = run(() => {
     const key = $("newParamKey").value.trim();
@@ -3936,6 +4129,7 @@ export function mountConsole(document = globalThis.document, options = {}) {
     globalThis.removeEventListener("focus", onRestore);
     document.removeEventListener("sm75-native-settings", onNativeSettings);
     document.removeEventListener("sm75-native-navigate", onNativeNavigate);
+    document.removeEventListener("sm75-native-panel", onNativePanel);
     globalThis.removeEventListener("popstate", onPop);
     monitorSizeObserver?.disconnect();
     monitorControlObserver?.disconnect();

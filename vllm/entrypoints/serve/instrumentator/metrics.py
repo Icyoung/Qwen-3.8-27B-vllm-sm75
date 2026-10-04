@@ -57,6 +57,9 @@ def attach_router(app: FastAPI):
     """Mount prometheus metrics to a FastAPI app."""
 
     registry = get_prometheus_registry()
+    from .request_timing import attach_request_timing
+
+    attach_request_timing(app, registry)
 
     # `response_class=PrometheusResponse` is needed to return an HTTP response
     # with header "Content-Type: text/plain; version=0.0.4; charset=utf-8"

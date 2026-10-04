@@ -2,5 +2,9 @@
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 COPY ultra/source/lmcache /opt/vllm-sm75/lmcache
+COPY ultra/source/console/lmcache_probe.py /opt/vllm-sm75/console/lmcache_probe.py
+COPY docker/helpers/lmcache-launch.py /opt/vllm-sm75/lmcache-launch.py
+COPY docker/helpers/lmcache-entrypoint.sh /opt/vllm-sm75/lmcache-entrypoint.sh
+RUN chmod +x /opt/vllm-sm75/lmcache-entrypoint.sh
 RUN python3 /opt/vllm-sm75/lmcache/install.py --install --build-no-gpu
 LABEL io.sm75.lmcache.version="0.5.5" io.sm75.lmcache.channel="experimental"

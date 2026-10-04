@@ -9,7 +9,7 @@ import {harnessPatch, managedHarnessConfig, legacyHarnessConfig, harnessPath} fr
 import {apply as managedPlugin} from '../plugins/sm75-workbench/lib/index.js';
 import {installNativePlugins} from '../install-native-plugins.mjs';
 import {applyBranding} from '../apply-branding.mjs';
-import {applyUnifiedShell} from '../native-shell.mjs';
+import {applyUnifiedShell, patchNativeAppearanceRestore} from '../native-shell.mjs';
 
 const profile = {id: 'test', port: 8000, args: ['/models/test', '--served-model-name', 'local-test', '--max-model-len', '8192']};
 
@@ -42,6 +42,7 @@ test('native managed model update retains unrelated providers and edits without 
     id: 'workspace-controller', config: {documentsDirectory: '/dsh/workspace'},
   });
   assert.equal(patch.some(row => row.id === 'workspace'), false);
+  assert.deepEqual(patch.find(row=>row.id==='session-query-sqlite').config,{path:'/dsh/home/indexes/session-search.sqlite',openAt:'first-search'});
 });
 
 test('managed readiness exposes a safe failing stage without leaking provider configuration', async()=>{
@@ -135,25 +136,34 @@ test('installer retains native layout behavior and loads the sampling adapter th
     write('@deepseek-ai/dsh-client-ui-settings-general/lib/client.js', 'function SettingsRoot(props) {return props.value;} function GeneralSection({value}) {return value;}');
     write('@deepseek-ai/dsh-client-ui-theme/lib/client.js', `const zh={"fontSize.title":"字号大小","fontSize.description":"仅影响会话内容的字号"};const en={"fontSize.title":"Font size","fontSize.description":"Only affects conversation content"};
       const fontControls={disabled: fontSize >= 26};
-      const FONT_SIZE_FIELD="fontSize";
+      const FONT_SIZE_FIELD="fontSize", THEME_PREFERENCE_FIELD="preference", DEFAULT_PREFERENCE="dark";
+      const isThemePreference=id=>["light","dark","system"].includes(id);
       class ThemeRuntime {
-        constructor(host) {this.host=host;this.ctx={logger:{warn(){}}};this.fontSize=14;this.preference="dark";this.published=[];}
+        constructor(ctx, host) {this.host=host;this.ctx=ctx;this.fontSize=14;this.preference = DEFAULT_PREFERENCE;this.published=[];}
+        setTheme(id) {if(this.preference===id)return;this.preference=id;if (isThemePreference(id)) this.host.set(THEME_PREFERENCE_FIELD, id);this.publish();}
         setFontSize(px) {if(this.fontSize===px)return;this.fontSize=px;this.host.set(FONT_SIZE_FIELD, px);this.publish();}
         adopt() {const section = this.host.getSnapshot().value;if (section === void 0) return;
           if(this.preference === section.preference && this.fontSize === section.fontSize)return;
-          this.preference=section.preference;this.fontSize = section.fontSize;this.publish();}
+          this.preference = section.preference;this.fontSize = section.fontSize;this.publish();}
         publish(){this.published.push(this.fontSize);}
       }
       globalThis.ThemeRuntime=ThemeRuntime;
     `);
     write('@deepseek-ai/dsh-client-ui-open-in-app/lib/client.js', 'const endpoint="/open-in-app/apps";');
-    const nativeLayout = 'function AppFrame({value}) {return value;} const productTitle = "DeepSeek Harness"; function updateTitle(title) { document.title = title === undefined ? productTitle : `${title} — ${productTitle}`; }';
+    write('@deepseek-ai/dsh-client-ui-workspace/lib/client.js', 'const normalizedQuery = sanitizeSearchQuery(query).trim();\n(0, react_jsx_runtime.jsx)("div", {\n\t\t\t\t\t\tclassName: WorkspaceBrowser_module_css_default.listArea,children: t("search.noMatches")});');
+    const nativeLayout = 'function DocumentTitle(props) {return props;} function AppFrame({value}) {return value;} const productTitle = "DeepSeek Harness"; function updateTitle(title) { document.title = title === undefined ? productTitle : `${title} — ${productTitle}`; }';
     write('@deepseek-ai/dsh-client-ui-layout/lib/client.js', nativeLayout + '\nfunction owner() {\nconst layout = new LayoutController(instance.actions, id => true);\nreturn layout;}');
     write('@deepseek-ai/dsh-client-ui-token-usage/package.json', '{}');
     write('sm75-workbench/lib/client.js', '// obsolete inverse embedding');
     const manifestBefore = JSON.parse(fs.readFileSync(path.join(root, '@deepseek-ai/dsh/package.json'), 'utf8'));
     manifestBefore.dependencies['@deepseek-ai/dsh-client-ui-token-usage'] = '0.1.6';
     write('@deepseek-ai/dsh/package.json', JSON.stringify(manifestBefore));
+    write('@deepseek-ai/dsh-client-ui-model-selection/lib/client.js','const current = projected.next ?? catalog.value.default;');
+    write('@deepseek-ai/dsh-api-session-controller/lib/index.js',`if (picked !== void 0) return picked;
+if (loggedHeader === void 0) return defaultModel.currentSelection();
+const logged = loggedHeader.config;\n\t\t\t\treturn {
+reasoningEffort: logged.reasoningEffort }\n\t\t\t\t};
+if (picked?.provider !== provider || picked.model !== model || picked.reasoningEffort !== reasoningEffort) return false;`);
     installNativePlugins(root);
     assert.equal(fs.existsSync(path.join(root, '@deepseek-ai/dsh-client-ui-token-usage')), false);
     assert.equal(fs.existsSync(path.join(root, 'sm75-workbench/lib/client.js')), false);
@@ -196,7 +206,7 @@ test('installer retains native layout behavior and loads the sampling adapter th
     assert.match(fs.readFileSync(path.join(root,'@deepseek-ai/dsh-client-ui-theme/lib/client.js'),'utf8'), /disabled: fontSize >= 17/);
     let accepted=14;
     const writes=[];
-    const runtime=new themeSandbox.ThemeRuntime({getSnapshot:()=>({value:{preference:'dark',fontSize:accepted}}),set:(_key,value)=>new Promise((resolve,reject)=>writes.push({value,resolve,reject}))});
+    const runtime=new themeSandbox.ThemeRuntime({logger:{warn(){}}},{getSnapshot:()=>({value:{preference:'dark',fontSize:accepted}}),set:(_key,value)=>new Promise((resolve,reject)=>writes.push({value,resolve,reject}))});
     for(const size of [15,16,17])runtime.setFontSize(size);
     accepted=15;runtime.adopt();writes[0].resolve(true);await Promise.resolve();
     assert.equal(runtime.fontSize,17);
@@ -211,6 +221,43 @@ test('installer retains native layout behavior and loads the sampling adapter th
     assert.equal(runtime.fontSize,12);assert.equal(runtime.sm75FontPending,false);
     runtime.setFontSize(13);writes.at(-1).reject(Error('synthetic transport failure'));assert.equal(await runtime.sm75FontWrite,false);
     assert.equal(runtime.fontSize,12);assert.equal(runtime.sm75FontPending,false);
+
+    // ConfigForm queues both fields in one namespace and only folds the last
+    // queued write's result. Earlier font promises can settle with an old mirror.
+    let appearance = {preference:'light',fontSize:17};
+    const appearanceWrites=[];
+    const combined=new themeSandbox.ThemeRuntime({logger:{warn(){}}},{
+      getSnapshot:()=>({value:appearance}),
+      set:(field,value)=>new Promise((resolve,reject)=>appearanceWrites.push({field,value,resolve,reject})),
+    });
+    combined.adopt();
+    for(const size of [16,15,14])combined.setFontSize(size);
+    combined.setTheme('dark');
+    for(let index=0;index<3;index++) {
+      appearance={preference:'light',fontSize:17-index};
+      combined.adopt();appearanceWrites[index].resolve(true);await Promise.resolve();
+      assert.equal(combined.preference,'dark','a superseded font reply must not revert the newer theme');
+      assert.equal(combined.fontSize,14,'keep the latest font while a later theme write still owns settlement');
+    }
+    await combined.sm75FontWrite;
+    assert.equal(combined.sm75AppearancePending,true);
+    appearance={preference:'light',fontSize:15};combined.adopt();
+    assert.equal(combined.fontSize,14);assert.equal(combined.preference,'dark');
+    appearance={preference:'dark',fontSize:14};combined.adopt();
+    appearanceWrites[3].resolve(true);await combined.sm75AppearanceWrite;
+    assert.equal(combined.sm75AppearancePending,false);
+    assert.equal(combined.sm75FontPending,false);
+    assert.equal(combined.fontSize,14);assert.equal(combined.preference,'dark');
+    combined.setTheme('light');combined.setFontSize(17);
+    appearance={preference:'light',fontSize:14};combined.adopt();
+    appearanceWrites[4].resolve(true);await Promise.resolve();
+    assert.equal(combined.fontSize,17);
+    appearanceWrites[5].resolve(false);await combined.sm75AppearanceWrite;
+    assert.equal(combined.fontSize,14,'a failed final write adopts the recovered durable snapshot');
+    assert.equal(combined.preference,'light');
+    combined.setTheme('dark');appearanceWrites[6].reject(Error('synthetic theme transport failure'));
+    assert.equal(await combined.sm75AppearanceWrite,false);
+    assert.equal(combined.preference,'light');assert.equal(combined.sm75AppearancePending,false);
 
     const shellBefore=shellFiles.map(file=>fs.readFileSync(file,'utf8'));
     applyUnifiedShell(root);
@@ -227,9 +274,12 @@ test('installer retains native layout behavior and loads the sampling adapter th
       const props={value:123};
       assert.equal(sandbox[fn](props),123);assert.equal(passed[0],props);
     }
-    const page = {document: {title: ''}, __SM75_NATIVE_SHELL__: {frame: props => props.value}};
+    let documentTitleOwner;
+    const page = {document: {title: ''}, __SM75_NATIVE_SHELL__: {frame: props => {documentTitleOwner=props.sm75DocumentTitle;return props.value;}}};
     vm.runInNewContext(patchedLayout, page);
     assert.equal(page.AppFrame({value: 42}), 42);
+    assert.equal(documentTitleOwner, page.DocumentTitle);
+    assert.equal(typeof documentTitleOwner, 'function');
     page.updateTitle();
     assert.equal(page.document.title, '工作台');
     page.updateTitle('Synthetic session');
@@ -247,15 +297,15 @@ test('installer retains native layout behavior and loads the sampling adapter th
 });
 
 
-function browserPluginHarness(slotRows = [], configurePage = () => {}) {
+function browserPluginHarness(slotRows = [], configurePage = () => {}, initialFontSize = 17, configureContext = () => {}) {
   const source=fs.readFileSync(new URL('../plugins/sm75-brand/lib/client.js',import.meta.url),'utf8');
-  let plugin,themeChange,currentTheme='dark';
+  let plugin,themeChange,currentTheme='dark',currentFont=initialFontSize;
   const components=new Map(),cleanups=[],events=[],panels=[],themes=[],subscriptions=new Set(),listeners=new Map(),styles=new Map();
   const React={
     Fragment:Symbol('fragment'),
     createElement:(type,props,...children)=>({type,props:{...props,children:children.length===1?children[0]:children}}),
     useEffect:effect=>{cleanups.push(effect());},
-    useRef:()=>({current:{getBoundingClientRect:()=>({width:1200})}}),
+    useRef:initial=>({current:initial===null?{getBoundingClientRect:()=>({width:1200})}:initial}),
     useLayoutEffect:effect=>{cleanups.push(effect());},
     useState:initial=>[typeof initial==='function'?initial():initial,()=>{}],
     useSyncExternalStore:(subscribe,snapshot)=>{subscriptions.add(subscribe(()=>{}));return snapshot();},
@@ -264,7 +314,7 @@ function browserPluginHarness(slotRows = [], configurePage = () => {}) {
     addEventListener:(name,fn)=>listeners.set(name,fn),removeEventListener:name=>listeners.delete(name),
     querySelector:()=>({dataset:{page:"harness"}}),
     getElementById:id=>({id}),documentElement:{style:{setProperty:(name,value)=>styles.set(name,value)}}},
-    localStorage:{getItem:()=> 'dark'},CustomEvent:class {constructor(type,{detail}={}){this.type=type;this.detail=detail;}},
+    localStorage:{getItem:key=>key==='sm75-color-mode'?'dark':null,setItem(){} },CustomEvent:class {constructor(type,{detail}={}){this.type=type;this.detail=detail;}},
     ResizeObserver:class{observe(){} disconnect(){}},
     window:{__ModuleLoader__:{load:item=>{plugin=item.factory(name=>name==='react'?React:{createPortal:(node,target)=>({portal:target.id,node})});}}}};
   configurePage(page);
@@ -273,11 +323,12 @@ function browserPluginHarness(slotRows = [], configurePage = () => {}) {
     slots:{inject:(_key,fn)=>fn(),register:({name,id},component)=>components.set(id||name,component),entries:name=>name==='settings.general.item'?slotRows:[],subscribe:()=>()=>{},getVersion:()=>0},
     effect:effect=>cleanups.push(effect()),
     layout:{sm75ActivePanel:()=>panels.length?panels.at(-1):null,selectPanel:id=>panels.push(id)},
-    theme:{getTheme:()=>({active:{colorScheme:currentTheme},fontSize:18}),setTheme:mode=>{currentTheme=mode;themes.push(mode);}},
+    theme:{getTheme:()=>({active:{colorScheme:currentTheme},fontSize:currentFont}),setTheme:mode=>{currentTheme=mode;themes.push(mode);}},
     on:(_name,fn)=>{themeChange=fn;return()=>{themeChange=null;};},
   };
+  configureContext(context);
   plugin.apply(context);
-  return {page,context,components,events,panels,themes,styles,listeners,React,themeChange:snapshot=>themeChange(snapshot),
+  return {page,context,components,events,panels,themes,styles,listeners,React,themeChange:snapshot=>themeChange(snapshot),setFontSize:size=>{currentFont=size;},
     cleanup:()=>{for(const cleanup of [...cleanups.reverse(),...subscriptions])if(typeof cleanup==='function')cleanup();}};
 }
 
@@ -296,7 +347,7 @@ test('native API is ready without a settings launcher and routes single-level pa
   assert.equal(api.ready,true);
   assert.equal(app.components.has('settings.launcher'),false);
   assert(app.events.some(e=>e.type==='sm75-native-ready'));
-  assert.equal(app.styles.get('--ui-fs'),String(18/14));
+  assert.equal(app.styles.get('--ui-fs'),String(17/14));
   // A redundant null selection previously aborted native workspace restore.
   api.selectPanel(null);assert.deepEqual(app.panels,[]);
   api.selectPanel('sm75-usage');assert.deepEqual(app.panels,['sm75-usage']);
@@ -309,9 +360,30 @@ test('native API is ready without a settings launcher and routes single-level pa
   assert.equal(app.events.find(e=>e.type==='sm75-native-settings').detail.id,'appearance');
   api.setTheme('invalid');api.setTheme('light');
   assert.deepEqual(app.themes,['light']);
-  app.themeChange({active:{colorScheme:'light'},fontSize:18});
+  app.themeChange({active:{colorScheme:'light'},fontSize:17});
   assert(app.events.some(e=>e.type==='sm75-set-theme'));
   app.cleanup();assert.equal(app.page.__SM75_WORKBENCH__,undefined);assert.equal(api.ready,false);
+});
+
+test('unified frame retains the native title owner and protects conversation width beside files',()=>{
+  const app=browserPluginHarness(),shell=app.page.__SM75_NATIVE_SHELL__;
+  const titleOwner=()=>null,useSessions=select=>select({byId:{}});
+  const panels=[];
+  const render=width=>{
+    const entry=shell.frame({useStore:select=>select({layoutInfo:{viewportWidth:width,rightbar:900,rightbarTrack:true}}),
+      useSessions,usePanelInfo:select=>select({activePanelId:null}),sm75DocumentTitle:titleOwner,
+      actions:{setViewportWidth(){}},renderSlot:(name,props)=>{if(name==='rightbar')panels.push(props);return null;}});
+    return entry.type(entry.props);
+  };
+  const output=render(720);
+  const title=output.props.children.find(child=>child?.type===titleOwner);
+  assert.equal(title.props.useSessions,useSessions);
+  assert.equal(title.props.productTitle,'工作台');
+  assert.equal(panels.at(-1).width,320);
+  assert.equal(output.props.style.gridTemplateColumns,'minmax(0,1fr) 320px');
+  render(699);assert.equal(panels.at(-1).canShow,false);assert.equal(panels.at(-1).width,0);
+  render(1400);assert.equal(panels.at(-1).width,900);
+  app.cleanup();
 });
 
 test('sidebar panel switching supports an already-loaded layout without the new state reader',()=>{
@@ -363,7 +435,7 @@ test('native settings render original sections into the chosen content tab and r
   assert.equal(output.props.children[0].portal,'nativeSettingsSurface');
   assert.deepEqual(calls.filter(c=>c.name==='settings.section').map(c=>c.options.only),['models']);
   calls.length=0;api.selectSettings('assistant');render();
-  assert.deepEqual(calls.filter(c=>c.name==='settings.section').map(c=>c.options.only),['general','agent-presets','plugins']);
+  assert.deepEqual(calls.filter(c=>c.name==='settings.section').map(c=>c.options.only),['general','agent-presets']);
   calls.length=0;api.selectSettings(null);render();
   assert.equal(calls.some(c=>c.name==='settings.section'),false);
   calls.length=0;
@@ -373,6 +445,33 @@ test('native settings render original sections into the chosen content tab and r
   assert.equal(onboarding.options.only,'native-onboarding');
   onboarding.owner.openSection('models');
   assert.equal(app.events.find(e=>e.type==='sm75-native-settings').detail.id,'connections');
+  app.cleanup();
+});
+
+test('plugin settings and unknown extensions have one top-level home while accounts stay with connections',()=>{
+  const app=browserPluginHarness([],page=>{page.document.querySelector=()=>({dataset:{page:'plugins'}});});
+  const calls=[],states=[];let cursor=0,pending=[];
+  app.React.useState=initial=>{const at=cursor++;if(!(at in states))states[at]=typeof initial==='function'?initial():initial;
+    return [states[at],value=>{states[at]=typeof value==='function'?value(states[at]):value;}];};
+  app.React.useEffect=effect=>pending.push(effect);
+  const props={useSections:select=>select(['general','models','account','agent-presets','plugins','extension-tools'].map(id=>({id,label:id}))),
+    useOnboardingSteps:select=>select([{id:'welcome'}]),useSessions:select=>select({phase:'ready',byId:{}}),
+    useConnectionState:select=>select('connected'),reconnect(){},renderSlot:(name,owner,options)=>{calls.push({name,owner,options});return {name};}};
+  const render=()=>{cursor=0;pending=[];calls.length=0;const entry=app.page.__SM75_NATIVE_SHELL__.settings(props);
+    const output=entry.type(entry.props);for(const effect of pending)effect();return output;};
+  const plugin=render().props.children.find(child=>child?.portal==='nativePluginSettingsSurface').node;
+  assert.equal(plugin.props.hidden,false);
+  assert.deepEqual(calls.filter(call=>call.name==='settings.section').map(call=>call.options.only),['plugins','extension-tools']);
+  app.listeners.get('sm75-route-change')({detail:{page:'settings'}});
+  app.page.__SM75_WORKBENCH__.selectSettings('connections');
+  const hidden=render().props.children.find(child=>child?.portal==='nativePluginSettingsSurface').node;
+  assert.equal(hidden.props.hidden,true);
+  assert.deepEqual(calls.filter(call=>call.name==='settings.section').map(call=>call.options.only),['models','account','plugins','extension-tools']);
+  app.page.__SM75_WORKBENCH__.selectSettings('assistant');render();
+  assert.equal(calls.filter(call=>call.name==='settings.section'&&call.options.only==='plugins').length,1);
+  app.listeners.get('sm75-route-change')({detail:{page:'harness'}});render();
+  calls.find(call=>call.name==='settings.onboarding').owner.openSection('extension-tools');
+  assert.equal(app.events.find(event=>event.type==='sm75-native-navigate').detail.page,'plugins');
   app.cleanup();
 });
 
@@ -550,4 +649,97 @@ test('native font scaling covers lazy styles and trajectory tokens exactly once 
   assert.equal(font.getPropertyValue('font'),'600 12px/16px var(--dsw-font-family)');
   assert.equal(tokens.getPropertyValue('--dsh-content-font-size-secondary'),'13px');
   assert.equal(lazy.getPropertyValue('font-size'),'17px');
+});
+
+test('cold native default cannot replace the pre-paint saved font while preferences restore',()=>{
+  let saved='17';
+  const app=browserPluginHarness([],page=>{
+    page.localStorage={
+      getItem:key=>key==='sm75-font-size'?saved:'dark',
+      setItem:(key,value)=>{if(key==='sm75-font-size')saved=value;},
+    };
+    page.document.documentElement.style.setProperty('--ui-fs',String(17/14));
+  },14);
+  assert.equal(app.styles.get('--ui-fs'),String(17/14));
+  app.themeChange({active:{colorScheme:'dark'},fontSize:14});
+  assert.equal(app.styles.get('--ui-fs'),String(17/14));
+  app.setFontSize(17);
+  app.themeChange({active:{colorScheme:'dark'},fontSize:17});
+  app.setFontSize(16);
+  app.themeChange({active:{colorScheme:'dark'},fontSize:16});
+  assert.equal(app.styles.get('--ui-fs'),String(16/14));
+  assert.equal(saved,'16');
+  app.cleanup();
+});
+
+
+test('native appearance restoration starts from cached presentation and adopts durable values without writing defaults',()=>{
+  const original = 'const DEFAULT_PREFERENCE="system"; class ThemeRuntime {fontSize=14; published=[]; constructor(ctx, host) {this.ctx=ctx;this.host=host;this.preference = DEFAULT_PREFERENCE;this.adopt();} adopt(){const section = this.host.getSnapshot().value; if (section === void 0) return; const fontSize=this.fontSizePending?this.fontSize:section.fontSize;if (this.preference === section.preference && this.fontSize === fontSize) return;this.preference=section.preference;this.fontSize=fontSize;this.publish();}publish(){this.published.push({preference:this.preference,fontSize:this.fontSize});}} globalThis.ThemeRuntime=ThemeRuntime;';
+  const patched=patchNativeAppearanceRestore(original);
+  assert.equal(patchNativeAppearanceRestore(patched),patched);
+  assert.throws(()=>patchNativeAppearanceRestore(original.replace('constructor(ctx, host)','constructor(host)')),/appearance restore anchor/);
+  const page={__SM75_APPEARANCE_SNAPSHOT__:{colorMode:'light',fontSize:17}};
+  vm.runInNewContext(patched,page);
+  let value,writes=0;
+  const runtime=new page.ThemeRuntime({}, {getSnapshot:()=>({value}),set:()=>{writes++;}});
+  assert.equal(runtime.preference,'light');assert.equal(runtime.fontSize,17);
+  assert.equal(runtime.sm75AppearanceRestored,false);assert.equal(runtime.published.length,0);
+  value={preference:'dark',fontSize:14};runtime.adopt();
+  assert.equal(runtime.preference,'dark');assert.equal(runtime.fontSize,14);
+  assert.equal(runtime.sm75AppearanceRestored,true);assert.equal(runtime.published.length,1);
+  runtime.adopt();assert.equal(runtime.published.length,1);assert.equal(writes,0);
+  value={preference:'light',fontSize:17};
+  const same=new page.ThemeRuntime({}, {getSnapshot:()=>({value}),set:()=>{writes++;}});
+  assert.equal(same.sm75AppearanceRestored,true);assert.equal(same.published.length,1);
+  assert.equal(writes,0);
+});
+
+test('native appearance bridge tolerates browser storage denial and waits for durable restore before replacing the first paint',()=>{
+  const app=browserPluginHarness([],page=>{
+    page.__SM75_APPEARANCE_SNAPSHOT__={fontSize:17,colorMode:'light'};
+    page.document.documentElement.style.setProperty('--ui-fs',String(17/14));
+    Object.defineProperty(page,'localStorage',{get(){throw Error('Browser storage denied');}});
+  },14,context=>{context.theme.sm75AppearanceRestored=false;});
+  assert.equal(app.styles.get('--ui-fs'),String(17/14));
+  assert.deepEqual(app.themes,[],'startup must not write a cached/default theme');
+  assert.equal(app.events.some(event=>event.type==='sm75-set-theme'),false);
+  app.themeChange({active:{colorScheme:'dark'},fontSize:14});
+  assert.equal(app.styles.get('--ui-fs'),String(17/14));
+  app.context.theme.sm75AppearanceRestored=true;
+  assert.doesNotThrow(()=>app.themeChange({active:{colorScheme:'dark'},fontSize:14}));
+  assert.equal(app.styles.get('--ui-fs'),'1');
+  assert.equal(app.events.findLast(event=>event.type==='sm75-set-theme').detail,'dark');
+  app.cleanup();
+  const unavailable=browserPluginHarness([],page=>{
+    page.localStorage={getItem(){throw Error('read denied');},setItem(){throw Error('write denied');}};
+  },16,context=>{context.theme.sm75AppearanceRestored=true;});
+  assert.equal(unavailable.styles.get('--ui-fs'),String(16/14));
+  assert.deepEqual(unavailable.themes,[]);unavailable.cleanup();
+});
+
+test('panel events distinguish initialization from native navigation',()=>{
+  const app=browserPluginHarness(),refs=[];let cursor=0;
+  app.React.useRef=initial=>{const index=cursor++;return refs[index]??=(initial===null
+    ? {current:{getBoundingClientRect:()=>({width:1200})}} : {current:initial});};
+  const render=panel=>{cursor=0;const entry=app.page.__SM75_NATIVE_SHELL__.frame({
+    useStore:select=>select({layoutInfo:{viewportWidth:1200}}),usePanelInfo:select=>select({activePanelId:panel}),
+    actions:{setViewportWidth(){}},renderSlot:()=>null});entry.type(entry.props);};
+  render(null);render('plugins');render(null);
+  assert.deepEqual(app.events.filter(event=>event.type==='sm75-native-panel').map(event=>[event.detail.id,event.detail.initial]),
+    [[null,true],['plugins',false],[null,false]]);
+  app.cleanup();
+});
+
+test('appearance settlement waits for a later theme write after the font promise resolves', async () => {
+  const app=browserPluginHarness(),api=app.page.__SM75_WORKBENCH__;
+  let settleFont,settleTheme,done=false;
+  app.context.theme.sm75FontWrite=new Promise(resolve=>{settleFont=resolve;});
+  const settled=api.fontSettled().then(result=>{done=true;return result;});
+  app.context.theme.sm75AppearanceWrite=new Promise(resolve=>{settleTheme=resolve;});
+  settleFont(true);await Promise.resolve();await Promise.resolve();
+  assert.equal(done,false,'a superseded font reply cannot report all appearance preferences settled');
+  settleTheme(true);assert.equal(await settled,true);
+  app.context.theme.sm75AppearanceWrite=Promise.resolve(false);
+  assert.equal(await api.fontSettled(),false);
+  app.cleanup();
 });

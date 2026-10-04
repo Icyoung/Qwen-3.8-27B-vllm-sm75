@@ -1,0 +1,28 @@
+# Reuse the validated CUDA/Torch/FlashQLA layer. Both editions share this core.
+ARG BASE_IMAGE=vllm-sm75:v0.1.6
+FROM ${BASE_IMAGE}
+ARG BASE_IMAGE_ID
+ARG SOURCE_SHA256
+COPY vllm /tmp/beta/vllm
+COPY docker/helpers /tmp/beta/helpers
+COPY docker/speculative /opt/vllm-sm75/speculative
+RUN python3 /tmp/beta/helpers/verify_cuda_libraries.py && \
+    python3 /tmp/beta/helpers/install_sm75_overlay.py /tmp/beta/vllm --source-copy /opt/vllm-sm75/source/vllm && \
+    python3 /tmp/beta/helpers/install_speculative.py && \
+    python3 /tmp/beta/helpers/verify_sm75_image.py
+COPY docker/next /opt/vllm-sm75/next
+RUN python3 /opt/vllm-sm75/next/install.py
+COPY docker/next/templates /opt/vllm-sm75/templates
+COPY ultra/source/profiles /opt/vllm-sm75/profiles
+COPY ultra/source/lmcache /opt/vllm-sm75/lmcache
+COPY ultra/source/console/lmcache_probe.py /opt/vllm-sm75/console/lmcache_probe.py
+COPY docker/helpers/lmcache-entrypoint.sh docker/helpers/lmcache-launch.py \
+     docker/helpers/runtime-entrypoint.py docker/helpers/pstate-entrypoint.sh \
+     docker/helpers/pstate-supervisor.sh /opt/vllm-sm75/
+RUN chmod +x /opt/vllm-sm75/*entrypoint* /opt/vllm-sm75/pstate-supervisor.sh && rm -rf /tmp/beta
+ENV NCCL_P2P_LEVEL=SYS SM75_EDITION=standard
+LABEL org.opencontainers.image.version="0.1.7-beta-next-rc-20261003" \
+      io.sm75.base-image-id="${BASE_IMAGE_ID}" io.sm75.source-sha256="${SOURCE_SHA256}"
+WORKDIR /opt/vllm-sm75
+ENTRYPOINT ["python3", "/opt/vllm-sm75/runtime-entrypoint.py"]
+CMD []

@@ -1,16 +1,82 @@
-@scope (body) to (.dsh-surface, body > :not(aside):not(main):not(script):not(style)) {
+/* The root must remain outside the body scope: these values paint before the
+   application and the native preference store have finished loading. */
 :root {
   color-scheme: dark;
-  --bg: #0b1019;
-  --card: #141e2c;
-  --text: #e9effa;
-  --muted: #93a5bd;
-  --line: #28374b;
-  --blue: #70bbff;
-  --green: #62e0b6;
-  --field: #1b293c;
+  --ui-fs: 1;
+  --sm75-ui-font-family: -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei UI","Microsoft YaHei","PingFang SC","Hiragino Sans GB","Noto Sans CJK SC","Noto Sans SC",Arial,sans-serif;
+  --dsw-font-family: var(--sm75-ui-font-family);
+  --bg: #151517;
+  --card: #202020;
+  --text: #f9fafb;
+  --muted: #a6adb8;
+  --line: rgba(255,255,255,.16);
+  --blue: #679efe;
+  --green: #4ed17e;
+  --field: #353638;
   --active: #20354d;
+  --on-primary: #101820;
+  --switch-off: #697483;
+  --switch-on: #167d5e;
+  --track: #253243;
+  --line2: #33475e;
+  --line3: #58718c;
+  --field2: #182434;
+  --field3: #202e40;
+  --chip-error-bg: #442829;
+  --chip-wait-bg: #3c3422;
+  --chip-ok-bg: #183a32;
+  --error-text: #ffa4a4;
+  --focus: #3b6fd4;
+  --shadow2: rgba(0,0,0,.42);
+  --amber: #ffcb76;
+  --gpu-low: #58e0bc;
+  --gpu-medium: #f5d35c;
+  --gpu-elevated: #ffab55;
+  --gpu-high: #ff7373;
+  --ink: var(--text);
+  --mint: var(--green);
+  --primary: var(--blue);
+  --info: var(--blue);
+  --warn: var(--amber);
+  --error: var(--error-text);
+  --text-color: var(--text);
+  --text-muted: var(--muted);
+  --bg-color: var(--bg);
+  --border-color: var(--line);
+  --card-bg: var(--card);
+  background: var(--bg);
 }
+:root[data-sm75-color-mode="light"] {
+  color-scheme: light;
+  --bg: #f4f6f9;
+  --card: #ffffff;
+  --text: #0b0d0f;
+  --muted: #3f4145;
+  --line: rgba(0,0,0,.16);
+  --blue: #2b4a92;
+  --green: #0e5229;
+  --field: #f5f6f7;
+  --active: #e7efff;
+  --on-primary: #ffffff;
+  --switch-off: #7b8796;
+  --track: #d9dfe7;
+  --line2: rgba(0,0,0,.14);
+  --line3: rgba(0,0,0,.20);
+  --field2: #f2f5f8;
+  --field3: #eaeff5;
+  --chip-error-bg: #fdecec;
+  --chip-wait-bg: #fbf1dc;
+  --chip-ok-bg: #e7f6ee;
+  --error-text: #b01515;
+  --focus: #2b4a92;
+  --shadow2: rgba(0,0,0,.12);
+  --amber: #6f3004;
+  --gpu-low: #087f69;
+  --gpu-medium: #8a6500;
+  --gpu-elevated: #b45309;
+  --gpu-high: #c62828;
+}
+@scope (body) to (.dsh-surface, body > :not(aside):not(main):not(script):not(style)) {
 * {
   box-sizing: border-box;
 }
@@ -19,7 +85,7 @@ body {
   display: flex;
   background: var(--bg);
   color: var(--text);
-  font-family: system-ui, "Microsoft YaHei", sans-serif;
+  font-family: var(--sm75-ui-font-family);
   font-size: calc(16px * var(--ui-fs, 1));
   line-height: 1.6;
 }
@@ -352,9 +418,9 @@ textarea {
   min-width: 0;
 }
 button.primary {
-  background: #236b9c;
-  border-color: #388abf;
-  color: white;
+  background: var(--primary);
+  color: var(--on-primary);
+  border-color: var(--primary);
 }
 button:disabled {
   opacity: 0.5;
@@ -1956,7 +2022,7 @@ main:not([data-auth="authenticated"]) > #taskDrawer {
 }
 .login-card #signin {
   background: var(--blue) !important;
-  color: #fff !important;
+  color: var(--on-primary) !important;
   font-weight: 650;
 }
 .login-card details {
@@ -2039,7 +2105,7 @@ select:focus-visible {
   display: flex;
   flex-wrap: nowrap;
   gap: 10px;
-  overflow-x: auto;
+  overflow: visible;
 }
 .engine-toolbar header h1 {
   flex: 1 0 auto;
@@ -2118,7 +2184,7 @@ select:focus-visible {
 #profileEditor .help {font-size: calc(12px * var(--ui-fs, 1)); line-height: 1.7; color:var(--muted); margin: 12px 0 0;}
 #profileEditor .model-row {grid-template-columns: minmax(110px,1fr) minmax(180px,3fr) minmax(120px,1fr);}
 #profileEditor .model-row > .span3 {grid-column: auto;}
-#profileEditor .feature-cards {grid-template-columns: minmax(180px,280px); padding-top: 14px;}
+#profileEditor .feature-cards {grid-template-columns: minmax(0,280px); padding-top: 14px;}
 #profileEditor .feature-card {padding: 0 12px; background: var(--bg);}
 #profileEditor .feature-head {min-height: 36px;}
 #profileEditor .editor-fold {padding: 0; overflow: hidden;}
@@ -2189,10 +2255,21 @@ body > main[data-auth="authenticated"] {margin-left:var(--sm75-sidebar-width);wi
 .workspace-page > #harness {padding:0;border:0;border-radius:0;min-height:0;}
 #harness {display:flex;flex-direction:column;overflow:hidden;}
 #harness > #root {flex:1;min-height:0;width:100%;border:0;border-radius:0;}
-.dsh-surface {font-family:var(--dsw-font-family,system-ui,"Microsoft YaHei",sans-serif);font-size:calc(14px * var(--ui-fs, 1));line-height:1.5;color:var(--dsw-alias-label-primary);box-sizing:border-box;}
+.dsh-surface {--dsw-font-family:var(--sm75-ui-font-family);font-family:var(--sm75-ui-font-family);font-size:calc(14px * var(--ui-fs, 1));line-height:1.5;color:var(--dsw-alias-label-primary);box-sizing:border-box;}
 .dsh-surface *, .dsh-surface *::before, .dsh-surface *::after {box-sizing:border-box;}
 .sm75-native-frame {position:relative;display:grid;grid-template-rows:minmax(0,1fr);height:100%;min-height:0;overflow:hidden;background:var(--dsw-alias-bg-base);}
 .sm75-native-main {display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;}
+/* Keep the two plugin sections in the native manager's existing content column.
+   Only this page uses document flow; conversations and usage keep their panels. */
+main[data-page="plugins"] {--sm75-plugin-inline-padding:clamp(16px,3vw,48px);}
+main[data-page="plugins"] > #harness:not([hidden]) {overflow-y:auto;overflow-x:hidden;}
+main[data-page="plugins"] #harness > #root {flex:0 0 auto;height:auto;}
+main[data-page="plugins"] #root .sm75-native-frame {height:auto;grid-template-rows:auto;overflow:visible;}
+main[data-page="plugins"] #root .sm75-native-main {overflow:visible;}
+main[data-page="plugins"] #root .sm75-native-panel {height:auto!important;}
+main[data-page="plugins"] #root .sm75-native-panel > [data-slot="main"] > section {height:auto;min-height:0;padding-inline:var(--sm75-plugin-inline-padding);padding-bottom:28px;overflow:visible;}
+main[data-page="plugins"] #nativePluginSettingsSurface {flex:0 0 auto;min-width:0;width:calc(100% - 2 * var(--sm75-plugin-inline-padding));max-width:960px;margin:0 auto 48px;}
+main[data-page="plugins"] #nativePluginSettingsSurface [data-slot="settings.section"] > * {width:100%;max-width:none;}
 .sm75-native-right {position:relative;min-width:0;min-height:0;}
 .sm75-native-overlay {position:absolute;inset:0;pointer-events:none;z-index:30;}
 .sm75-native-overlay > * {pointer-events:auto;}
@@ -2205,7 +2282,7 @@ body > main[data-auth="authenticated"] {margin-left:var(--sm75-sidebar-width);wi
 .sm75-native-menu-item:hover,.sm75-native-menu-item[aria-current] {background:var(--field);}
 #nativeOverlays:empty {display:none;}
 #nativeOverlays [role="dialog"] {max-width:calc(100vw - 32px);}
-.sm75-settings-fields {font:calc(14px * var(--ui-fs, 1))/1.6 system-ui,"Microsoft YaHei",sans-serif;color:var(--text);}
+.sm75-settings-fields {font:calc(14px * var(--ui-fs, 1))/1.6 var(--sm75-ui-font-family);color:var(--text);}
 .sm75-settings-fields h2 {font-size:calc(16px * var(--ui-fs, 1));margin:0 0 12px;}
 .sm75-settings-fields p {color:var(--muted);font-size:calc(13px * var(--ui-fs, 1));}
 .sm75-settings-fields label {display:flex;flex-direction:column;gap:6px;margin:10px 0;}
@@ -2229,8 +2306,8 @@ body > main[data-auth="authenticated"] {margin-left:var(--sm75-sidebar-width);wi
 
 /* Shared application chrome: one navigation, one fixed-height toolbar. */
 /* Native modules also style body; retain the original console inheritance. */
-html > body {font-family:system-ui,"Microsoft YaHei",sans-serif;font-size:calc(16px * var(--ui-fs,1));line-height:1.6;}
-body > main[data-auth="authenticated"] {padding:0 20px 20px; height:100dvh; min-height:0; display:flex; flex-direction:column; overflow:hidden;}
+html > body {--dsw-font-family:var(--sm75-ui-font-family);font-family:var(--sm75-ui-font-family);font-size:calc(16px * var(--ui-fs,1));line-height:1.6;}
+body > main[data-auth="authenticated"] {padding:0 20px 20px; box-sizing:border-box; min-width:0; height:100dvh; min-height:0; display:flex; flex-direction:column; overflow:hidden;}
 body > main > section:not([hidden]) {flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;margin:0;padding:20px 0;box-sizing:border-box;}
 body > main > #harness:not([hidden]) {padding:0;}
 #consoleSidebar {padding:16px 12px;}
@@ -2244,7 +2321,7 @@ body > main > #harness:not([hidden]) {padding:0;}
   margin:0;padding:0;border-bottom:1px solid var(--line);
   overflow:visible;white-space:nowrap;
 }
-#appHeader #title {flex:1 1 100px;min-width:64px;max-width:none;font-size:calc(16px * var(--ui-fs, 1));font-weight:650;line-height:calc(24px * var(--ui-fs, 1));white-space:nowrap;}
+#appHeader #title {flex:1 1 100px;min-width:64px;max-width:none;font-size:calc(16px * var(--ui-fs, 1));font-weight:500;line-height:calc(24px * var(--ui-fs, 1));white-space:nowrap;}
 #appHeader #active {flex:0 1 140px;min-width:96px;max-width:140px;width:140px;height:34px;padding:4px 24px 4px 8px;font-size:calc(14px * var(--ui-fs, 1));text-overflow:ellipsis;}
 #appHeader #liveSummary {order:0;flex:0 0 auto;min-width:max-content;max-width:none;padding:0;overflow:visible;}
 #appHeader > button {display:inline-flex;flex:0 0 auto;align-items:center;justify-content:center;height:auto;min-height:32px;min-width:30px;max-width:none;margin:0;padding:4px 7px;font-size:calc(16px * var(--ui-fs, 1));line-height:calc(22px * var(--ui-fs, 1));border-radius:7px;}
@@ -2267,7 +2344,7 @@ body > main > #harness:not([hidden]) {padding:0;}
 #notice:empty {display:none;}
 #notice:not(:empty) {flex:none;margin:10px 0 0;font-size:calc(14px * var(--ui-fs, 1));}
 #profiles #profileEditor {width:100%;max-width:none;margin:0;padding-top:8px;}
-#profiles #profileCards {width:100%;max-width:none;}
+#profiles #profileCards {width:100%;max-width:none;box-sizing:border-box;min-width:0;}
 #profiles #profileEditor .profile-toolbar {width:100%;margin:0;}
 #profiles #profileEditor label {font-size:calc(14px * var(--ui-fs, 1));}
 #profiles #profileEditor .help {font-size:calc(14px * var(--ui-fs, 1));}
@@ -2318,7 +2395,7 @@ body > main > #harness:not([hidden]) {padding:0;}
   #consoleSidebar .brand {font-size:calc(16px * var(--ui-fs, 1));gap:6px;}
   #consoleSidebar .brand img {width:24px;height:24px;}
   #appHeader:not([hidden]) {gap:4px;}
-  #appHeader #workspaceToolbar {min-width:224px;}
+  #appHeader #workspaceToolbar {min-width:160px;}
   #workspaceToolbar [data-slot="conversation.session.header"] > div:first-child {gap:2px;}
   #workspaceToolbar [data-slot="conversation.session.header"] > div:first-child > div:first-child {gap:4px;}
   #workspaceToolbar [data-conversation-tabs] {gap:0;}
@@ -2336,3 +2413,35 @@ body > main > #harness:not([hidden]) {padding:0;}
 #sidebarHeaderActions button {display:inline-flex;align-items:center;justify-content:center;gap:4px;min-height:34px;font-size:calc(16px * var(--ui-fs,1));}
 #sidebarHeaderActions #taskCount {font-size:calc(13px * var(--ui-fs,1));}
 #sidebarHeaderActions:not(:empty) + .sidebar-foot {margin-top:0;}
+
+/* v0.1.7 beta: one editor shared by the model library and saved profiles. */
+#modelLaunch,#modelEditorMount,#profileEditor {width:100%;max-width:none;box-sizing:border-box;margin-left:0;margin-right:0;}
+.model-source-row {display:flex;align-items:end;gap:12px;margin:14px 0;}
+.model-source-row label {min-width:180px;max-width:480px;flex:1;}
+.editor-tabs {display:flex;gap:8px;margin:14px 0;border-bottom:1px solid var(--line);padding-bottom:10px;}
+.editor-tabs button {font:inherit;white-space:nowrap;}
+.editor-tabs button[aria-selected=true] {background:var(--active);color:var(--blue);}
+#profileEditor > [hidden] {display:none!important;}
+#modelSettings > [data-resource-group] {margin-top:16px;}
+
+#modelLaunch #profileEditor label, #modelLaunch #profileEditor .help {font-size:calc(14px * var(--ui-fs, 1));}
+
+.sm75-workspace-filter {display:flex;align-items:center;gap:6px;padding:4px 2px;font-size:calc(12px * var(--ui-fs,1));}
+.sm75-workspace-filter span {min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;}
+.sm75-workspace-filter button {flex:none;padding:2px 4px;font-size:inherit;}
+
+#modelSettings > [data-resource-group] {border:0;background:transparent;padding:0;margin-top:18px;}
+#modelSettings > [data-resource-group] > summary {display:none;}
+#modelSettings > [data-resource-group] > .parameter-grid {padding:0;}
+
+/* Model API access shares the normal form scale and remains usable over LAN HTTP. */
+#apiAccessDialog {width:min(720px,calc(100vw - 48px));max-height:calc(100vh - 48px);box-sizing:border-box;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--text);padding:20px;}
+#apiAccessDialog::backdrop {background:rgba(0,0,0,.5);}
+.api-access-heading {display:flex;align-items:center;justify-content:space-between;gap:16px;}
+.api-access-panel {display:grid;gap:14px;}
+.api-access-field > span {display:block;margin-bottom:6px;}
+.api-access-row {display:flex;align-items:center;gap:8px;}
+.api-access-row input {flex:1;min-width:0;}
+.api-access-row button {flex:none;white-space:nowrap;}
+.api-access-status {margin:0;min-height:1.5em;}
+#modelApiSettings {margin-bottom:24px;}

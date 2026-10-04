@@ -11,10 +11,12 @@ FROM ${BASE_IMAGE}
 ENV NCCL_P2P_LEVEL=SYS
 ARG SOURCE_REVISION=working-tree
 ARG SOURCE_SHA256
-LABEL org.opencontainers.image.title="VLLM-SM75 ultra release candidate" \
+ARG RELEASE_VERSION=0.1.7-beta
+LABEL org.opencontainers.image.title="VLLM-SM75 Ultra" \
       org.opencontainers.image.revision="${SOURCE_REVISION}" \
       io.sm75.console.source-sha256="${SOURCE_SHA256}" \
-      io.sm75.release.channel="candidate"
+      org.opencontainers.image.version="${RELEASE_VERSION}" \
+      io.sm75.release.channel="beta"
 # Remove packages deleted upstream; COPY alone would retain stale modules.
 RUN rm -rf /opt/harness/node_modules
 COPY --from=harness /usr/local/bin/node /usr/local/bin/node
@@ -22,6 +24,7 @@ COPY --from=harness /opt/harness/node_modules /opt/harness/node_modules
 RUN ln -sf /opt/harness/node_modules/pnpm/bin/pnpm.mjs /usr/local/bin/pnpm \
     && pnpm --version
 COPY overlay/font-scale.py /opt/vllm-sm75/font-scale.py
+RUN rm -rf /opt/sm75-workbench/console
 COPY source /opt/sm75-workbench
 ARG INSTALL_LMCACHE=0
 RUN if [ "${INSTALL_LMCACHE}" = "1" ]; then python3 /opt/sm75-workbench/lmcache/install.py --install; fi

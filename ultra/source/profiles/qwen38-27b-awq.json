@@ -1,0 +1,98 @@
+{
+  "id": "qwen38-27b-awq",
+  "name": "Qwen3.8 27B · AWQ · 普通推理",
+  "modelFamily": "qwen3_5",
+  "defaultModel": "/models/Qwen3.8-27B-W4A16-AWQ",
+  "defaultDraftModel": "/models/Qwen3.8-27B-DFlash2",
+  "format": "awq",
+  "args": [
+    "${MODEL}",
+    "--served-model-name",
+    "VLLM-Qwen3.8-27B",
+    "--dtype",
+    "float16",
+    "--hf-overrides",
+    {
+      "dtype": "float16"
+    },
+    "--tensor-parallel-size",
+    "4",
+    "--max-num-seqs",
+    "8",
+    "--max-num-batched-tokens",
+    "16384",
+    "--gpu-memory-utilization",
+    "0.87",
+    "--max-model-len",
+    "262144",
+    "--kv-cache-dtype",
+    "fp8_e4m3",
+    "--kv-cache-memory-bytes",
+    "4294967296",
+    "--kv-transfer-config",
+    {
+      "kv_connector": "OffloadingConnector",
+      "kv_role": "kv_both",
+      "kv_connector_extra_config": {
+        "spec_name": "CPUOffloadingSpec",
+        "cpu_bytes_to_use": 8589934592
+      }
+    },
+    "--attention-config",
+    {
+      "backend": "FLASHINFER"
+    },
+    "--gdn-prefill-backend",
+    "flashqla_sm75",
+    "--block-size",
+    "32",
+    "--enable-prefix-caching",
+    "--async-scheduling",
+    "--disable-custom-all-reduce",
+    "--enable-prompt-tokens-details",
+    "--generation-config",
+    "vllm",
+    "--host",
+    "0.0.0.0",
+    "--port",
+    "8000",
+    "--auto-sleep-idle-timeout",
+    "0",
+    "--compilation-config",
+    {
+      "cudagraph_mode": "FULL_AND_PIECEWISE"
+    }
+  ],
+  "env": {
+    "CUDA_VISIBLE_DEVICES": "0,1,2,3",
+    "NCCL_P2P_LEVEL": "SYS",
+    "NCCL_IB_DISABLE": "1",
+    "NCCL_DEBUG": "WARN",
+    "VLLM_USE_MODELSCOPE": "false",
+    "HF_HUB_OFFLINE": "1",
+    "TRANSFORMERS_OFFLINE": "1",
+    "OMP_NUM_THREADS": "2",
+    "MAX_JOBS": "1",
+    "NVCC_THREADS": "1",
+    "TORCHINDUCTOR_COMPILE_THREADS": "1",
+    "VLLM_MARLIN_USE_ATOMIC_ADD": "1",
+    "VLLM_GDN_DECODE_KERNEL": "triton",
+    "VLLM_USE_FLASHINFER_SAMPLER": "0",
+    "VLLM_USE_NCCL_SYMM_MEM": "0",
+    "VLLM_ALLREDUCE_USE_SYMM_MEM": "0",
+    "VLLM_ALLREDUCE_USE_FLASHINFER": "0",
+    "VLLM_FIREFLY": "1",
+    "VLLM_FIREFLY_AR": "auto",
+    "VLLM_FIREFLY_AR_BACKEND": "auto"
+  },
+  "power": {
+    "mode": "pstate",
+    "idleSeconds": 1800,
+    "util": 5,
+    "confirm": 60,
+    "low": 8,
+    "high": 16,
+    "poll": 5,
+    "gpus": "0,1,2,3"
+  }
+}

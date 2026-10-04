@@ -7,6 +7,7 @@ import {argValue, GiB} from '../public/context-config.js';
 // Its top-level auto-mount is inactive; the exported form binding is unchanged.
 const appURL = new URL('../public/app.js', import.meta.url);
 const source = fs.readFileSync(appURL, 'utf8')
+  .replace("from './api-access-ui.js'", 'from ' + JSON.stringify(new URL('../public/api-access-ui.js', import.meta.url).href))
   .replace('from "/live-summary.js"', `from ${JSON.stringify(new URL('../public/live-summary.js', import.meta.url).href)}`)
   .replace('from "./context-config.js"', `from ${JSON.stringify(new URL('../public/context-config.js', import.meta.url).href)}`)
   .replace('from "./lmcache-config.js"', `from ${JSON.stringify(new URL('../public/lmcache-config.js', import.meta.url).href)}`);

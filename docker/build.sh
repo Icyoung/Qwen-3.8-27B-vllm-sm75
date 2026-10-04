@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 构建正式镜像 vllm-sm75:v$(cat docker/VERSION)
+# 鏋勫缓姝ｅ紡闀滃儚 vllm-sm75:v$(cat docker/VERSION)
 set -euo pipefail
 # Production Unraid has previously stalled while exporting full image layers.
 # Temporary guard for the unisolated exporter that caused the incident.
@@ -11,6 +11,8 @@ fi
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 VERSION="$(tr -d ' \r\n' < "$ROOT/docker/VERSION")"
 [[ -n "$VERSION" ]] || { echo 'docker/VERSION is empty' >&2; exit 2; }
+ULTRA_VERSION="${VERSION%-beta}-ultra-beta"
+[[ "$VERSION" == *-beta ]] || ULTRA_VERSION="$VERSION-ultra"
 EDITION="${EDITION:-standard}"
 BUILD_MODE="${BUILD_MODE:-full}"
 case "$EDITION:$BUILD_MODE" in standard:full|standard:fast|ultra:full|ultra:ui) ;;
@@ -21,21 +23,23 @@ SOURCE_REVISION="${SOURCE_REVISION:-$(git -C "$ROOT" rev-parse HEAD 2>/dev/null 
 if [[ "$EDITION" == ultra ]]; then
     if [[ "$BUILD_MODE" == ui ]]; then
         : "${RUNTIME_IMAGE:?Set RUNTIME_IMAGE to an audited ultra runtime image}"
+        ui_recipe="$ROOT/ultra/Dockerfile.ui"
+        if [[ "${INSTALL_LMCACHE:-0}" == 1 ]]; then ui_recipe="$ROOT/ultra/Dockerfile.candidate"; fi
         docker image inspect "$RUNTIME_IMAGE" >/dev/null
         export DOCKER_BUILDKIT=0
         exec docker build --network "${BUILD_NETWORK:-default}" --memory 1g --memory-swap 1g \
-            --cpu-period 100000 --cpu-quota 100000 --file "$ROOT/ultra/Dockerfile.candidate" \
+            --cpu-period 100000 --cpu-quota 100000 --file "$ui_recipe" \
             --build-arg BASE_IMAGE="$RUNTIME_IMAGE" --build-arg SOURCE_REVISION="$SOURCE_REVISION" \
-            --build-arg SOURCE_SHA256="${SOURCE_SHA256:-}" \
+            --build-arg SOURCE_SHA256="${SOURCE_SHA256:-}" --build-arg RELEASE_VERSION="$VERSION" \
             --build-arg INSTALL_LMCACHE="${INSTALL_LMCACHE:-0}" \
-            --tag "${IMAGE:-vllm-sm75:v${VERSION}-ultra-ui}" "$ROOT/ultra"
+            --tag "${IMAGE:-vllm-sm75:v${ULTRA_VERSION}-ui}" "$ROOT/ultra"
     fi
     VLLM_IMAGE="${VLLM_IMAGE:-vllm-sm75:v${VERSION}}"
     docker image inspect "$VLLM_IMAGE" >/dev/null
     exec docker build --file "$ROOT/ultra/Dockerfile" \
-        --build-arg VLLM_IMAGE="$VLLM_IMAGE" --build-arg SOURCE_REVISION="$SOURCE_REVISION" \
+        --build-arg VLLM_IMAGE="$VLLM_IMAGE" --build-arg SOURCE_REVISION="$SOURCE_REVISION" --build-arg RELEASE_VERSION="$VERSION" \
         --build-arg INSTALL_LMCACHE="${INSTALL_LMCACHE:-0}" \
-        --tag "${IMAGE:-vllm-sm75:v${VERSION}-ultra}" "$ROOT/ultra"
+        --tag "${IMAGE:-vllm-sm75:v${ULTRA_VERSION}}" "$ROOT/ultra"
 fi
 file=Dockerfile
 default_image="vllm-sm75:v${VERSION}"
@@ -46,6 +50,7 @@ fi
 docker build --file "$ROOT/docker/$file" --target final \
     --build-arg BASE_IMAGE="$BASE_IMAGE" \
     --build-arg MAX_JOBS="${MAX_JOBS:-1}" \
+    --build-arg INSTALL_LMCACHE="${INSTALL_LMCACHE:-0}" \
     --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     --build-arg SOURCE_REVISION="$SOURCE_REVISION" \
     --build-arg BASE_IMAGE_ID="$BASE_IMAGE" \

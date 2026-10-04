@@ -7,7 +7,7 @@
   ><link rel="icon" href="/brand/favicon.svg" /><link
     rel="manifest"
     href="/brand/manifest.webmanifest"
-  /><link rel="stylesheet" href="/style.css" />
+  /><script src="/appearance-bootstrap.js"></script><link rel="stylesheet" href="/style.css" />
   <body>
     <aside id="consoleSidebar" hidden>
       <h2 class="brand">
@@ -93,6 +93,16 @@
         </details>
       </section>
       <section id="models" hidden>
+        <div id="modelLaunch" hidden>
+          <div class="actions"><button id="backModels">返回模型库</button><h3 id="launchModelTitle"></h3></div>
+          <div class="model-source-row">
+            <label>配置来源<select id="modelSourceKind"><option value="base">通用模板</option><option value="saved">已保存配置</option><option value="custom">自定义</option></select></label>
+            <label id="modelSourceLabel">配置模板<select id="modelSourceTemplate"></select></label>
+            <button id="loadModelSource">载入配置</button>
+          </div>
+          <p id="modelDraftNotice" class="help" role="status"></p>
+          <div id="modelEditorMount"></div>
+        </div>
         <div class="subnav">
           <button id="localModelsTab" class="selected">本地模型</button
           ><button id="downloadModelsTab">搜索下载</button>
@@ -140,7 +150,7 @@
           <div class="actions">
             <p>选择配置即可启动，编辑后可保存为个人模板。</p>
             <button id="createProfile">新建配置</button
-            ><button id="importProfile">导入配置</button>
+            ><button id="importProfile">导入配置</button><button type="button" data-open-api-access>API 地址 / Key</button>
           </div>
           <div id="profileCards" class="profile-cards"></div>
         </div>
@@ -148,11 +158,19 @@
           <div class="profile-toolbar">
             <label>配置名称<input id="profileName" placeholder="例如：单人长上下文" /></label>
             <div class="profile-save-actions">
+              <button type="button" data-open-api-access>API 地址 / Key</button>
               <button id="backProfiles">收起编辑</button>
               <button id="newProfile">另存配置</button>
-              <button id="save" class="primary">保存配置</button>
+              <button id="save">保存配置</button><button id="saveAndStart" class="primary">保存并启动</button>
             </div>
             <p class="help">统一保存以下设置，模型下次启动时生效。</p>
+          </div>
+          <div class="editor-tabs" role="tablist" aria-label="运行参数分类">
+            <button type="button" role="tab" data-editor-tab="basic" aria-selected="true">基础与资源</button>
+            <button type="button" role="tab" data-editor-tab="acceleration">加速</button>
+            <button type="button" role="tab" data-editor-tab="cache">上下文与缓存</button>
+            <button type="button" role="tab" data-editor-tab="power">电源</button>
+            <button type="button" role="tab" data-editor-tab="advanced">高级参数</button>
           </div>
           <section class="editor-section" id="modelSettings">
             <h3 class="editor-caption">模型</h3>
@@ -161,7 +179,7 @@
                 >权重格式<select id="format">
                   <option value="fp8">FP8</option>
                   <option value="awq">AWQ</option>
-                  <option value="kat">自定义</option>
+                  <option value="fp16">FP16</option><option value="bf16">BF16 权重</option><option value="int8">INT8</option><option value="gptq">GPTQ</option><option value="nvfp4">NVFP4</option><option value="custom">自定义</option><option value="kat">旧版自定义</option>
                 </select></label
               ><label hidden
                 >API 端口<input
@@ -402,7 +420,7 @@
               <details class="editor-help"><summary>LMCache 使用说明</summary>
                 <p class="help">LMCache 0.5.5 提供 CPU 与磁盘分层缓存。缓存块大小须为运行日志中的块大小或其整数倍，更换模型或 TP 后重新核对。</p>
                 <p class="help">磁盘目录使用 Linux 绝对路径。“剩余空间”只做启动检查，用量上限由卷配额控制。启动时会检查依赖和缓存服务。</p>
-                <p class="help">当前支持 Ultra 单容器和本机运行；需使用 P-State，暂不支持 DFlash / MTP。选择此方案会替代原生 CPU KV，自定义连接器与草稿配置需手动处理。</p>
+                <p class="help">需要安装 LMCache 扩展并使用 P-State，暂不支持 DFlash / MTP。选择此方案会替代原生 CPU KV，自定义连接器与草稿配置需手动处理。</p>
               </details>
             </div>
             <p class="help cache-status" id="lmcacheStatus" role="status" aria-live="polite" style="white-space: pre-line"></p>
@@ -635,6 +653,7 @@
         ><button id="installHarness" hidden>安装</button
         ><button id="stopHarness" hidden>停止</button>
         <div id="root" class="dsh-surface" hidden></div>
+        <div id="nativePluginSettingsSurface" class="dsh-surface" hidden></div>
       </section>
       <section id="monitor" hidden>
         <div id="monitorControls" class="monitor-controls" hidden></div>
@@ -707,6 +726,7 @@
           <button id="saveUnifiedSettings" type="button">保存设置</button>
         </div>
         <p id="settingsSaveHint" class="help" role="status"></p>
+        <section id="modelApiSettings" data-settings-panel="connections" hidden><h2>本机模型 API</h2><div id="apiAccessSettings"></div></section>
         <div id="nativeSettingsSurface" class="dsh-surface" hidden></div>
         <div id="securitySettings" data-settings-panel="security" hidden>
           <h2>账号与访问控制</h2>
@@ -799,6 +819,7 @@
           </div>
         </div>
         <div id="deploymentSettings" data-settings-panel="deployment">
+          <p id="runtimeEnvironmentHint" class="help" role="status" hidden></p>
           <h2>硬件设置</h2>
           <button id="p2pCapability">检测 P2P</button>
           <p id="p2pResult">尚未检测</p>
@@ -818,17 +839,6 @@
             </details>
             <p class="help" id="p2pEvidence"></p>
           </details>
-          <h2>模型 API</h2>
-          <label
-            >API Key<input
-              id="modelApiKey"
-              type="password"
-              autocomplete="new-password"
-              placeholder="填写新的 API Key" /></label
-          ><button id="saveApiKey">保存 API Key</button>
-          <p id="apiKeyStatus" class="help">
-            保存后下次启动模型生效；工作台内部连接独立管理。
-          </p>
           <h2>目录与默认启动</h2>
           <label
             >模型下载目录<input
@@ -861,6 +871,7 @@
           ><button id="saveSettings" hidden>保存设置</button>
         </div>
       </section>
+      <dialog id="apiAccessDialog" aria-labelledby="apiAccessTitle"><div class="api-access-heading"><h2 id="apiAccessTitle">API 地址 / Key</h2><button id="closeApiAccess" type="button">关闭</button></div><div id="apiAccessDialogBody"></div></dialog>
       <dialog id="importProfileDialog">
         <h2>导入运行配置</h2>
         <label

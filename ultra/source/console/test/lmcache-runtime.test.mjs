@@ -168,6 +168,7 @@ async function freePort() {
 }
 test('real manager API rejects missing LMCache without disrupting a running native engine', {skip: process.platform !== 'linux'}, async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sm75-lmcache-api-')), engineFile = path.join(root, 'synthetic-engine');
+  fs.writeFileSync(path.join(root,'config.json'),'{}');fs.writeFileSync(path.join(root,'model.safetensors'),'synthetic');
   fs.writeFileSync(engineFile, '#!' + process.execPath + '\nsetInterval(() => {}, 1000);\nprocess.on("SIGTERM", () => process.exit(0));\n', {mode: 0o700});
   const port = await freePort(), proxyPort = await freePort();
   const manager = spawn(process.execPath, [fileURLToPath(new URL('../server.mjs', import.meta.url))], {
@@ -181,8 +182,8 @@ test('real manager API rejects missing LMCache without disrupting a running nati
     assert(ready, 'isolated API must start');
     const headers = {Authorization: 'Bearer ' + fs.readFileSync(path.join(root, 'key'), 'utf8').trim(), 'Content-Type': 'application/json'};
     const old = {id: 'old-engine', backend: 'native', format: 'fp8', cacheRoot: path.join(root, 'compile'), port: 18001,
-      args: ['/synthetic/model'], power: {mode: 'pstate'}};
-    const next = {...old, ...profile({id: 'new-cache-engine', port: 18002})};
+      args: [root], power: {mode: 'pstate'}};
+    const next = {...old, ...profile({id: 'new-cache-engine', port: 18002}),args:[root]};
     const post = (url, body) => fetch(base + url, {method: 'POST', headers, body: JSON.stringify(body)});
     for (const p of [old, next]) assert.equal((await post('/console-api/profiles', p)).status, 200);
     const started = await post('/console-api/profiles/old-engine/start', {});
@@ -321,6 +322,7 @@ process.on('SIGTERM',()=>process.exit(0));
 `, {mode: 0o700});
   const port = await freePort(), proxyPort = await freePort();
   const p = profile({id: 'native-race', format: 'fp8', cacheRoot: path.join(root, 'compile'), power: {mode: 'pstate'}});
+  fs.writeFileSync(path.join(root,'config.json'),'{}');fs.writeFileSync(path.join(root,'model.safetensors'),'synthetic');p.args[0]=root;
   p.lmcache.port = await freePort(); p.lmcache.httpPort = await freePort();
   const manager = spawn(process.execPath, [fileURLToPath(new URL('../server.mjs', import.meta.url))], {
     env: {...process.env, SM75_SINGLE_CONTAINER: '0', SM75_CONSOLE_ROOT: root,
@@ -392,4 +394,12 @@ test('native SIGTERM cancels pending cache readiness without using the public st
   assert.equal(fs.existsSync(gate('engine-started')), false);
   const pid = Number(fs.readFileSync(gate('helper-pid')));
   assert.throws(() => process.kill(pid, 0), {code: 'ESRCH'});
+});
+
+
+test('disk namespace includes effective chunk size after panel edits without environment changes',()=>{
+  const original=profile();
+  const changed={...original,lmcache:{...original.lmcache,chunkSize:original.lmcache.chunkSize*2}};
+  assert.notEqual(lmcachePlan(original,{runtimeFingerprint:'same-runtime'}).namespace,
+                  lmcachePlan(changed,{runtimeFingerprint:'same-runtime'}).namespace);
 });

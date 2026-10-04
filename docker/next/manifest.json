@@ -1,0 +1,118 @@
+{
+  "source_image": "sha256:3f1a9664747f9fc04c9440b896c5a0423c1857421e082a49bc0f8b95ca02b8ba",
+  "files": {
+    "vllm/models/qwen4_exp/common/hyperconnection.py": {
+      "sha256": "fdccae325ff0c00b0839c57362f5203955cd7bfef89794345608bf6b3670f06b",
+      "base_sha256": "cf2028bbd7dceb33f78393be62e3c936c29aff7255dc185f211d1e57cb007393",
+      "bytes": 9691
+    },
+    "vllm/models/qwen4_exp/common/qsa_cache.py": {
+      "sha256": "d59d47bcead54f35d4c0a23dfb93a62e9bdf209990dc0011e41e23252c9aefee",
+      "base_sha256": "c6651a0cf27e2ffb23b90eafe21e044df5609ce976f52ebffa7a4fbea688fc04",
+      "bytes": 34170
+    },
+    "vllm/models/qwen4_exp/nvidia/model.py": {
+      "sha256": "673714cc1e5f296f8e6ac6a23a24b261c987861229ec7dd0b8f8a02820797734",
+      "base_sha256": "2d9d98054dfa4e2c2c434526ef6fbdceede06b35c38a8ea6dccb42161a666dfb",
+      "bytes": 41722
+    },
+    "vllm/models/qwen4_exp/nvidia/hyperconnection.py": {
+      "sha256": "42b7a7afa2d3120966feda3fe171a45d8412b907fcd2d2807ab00ebfdecf0aca",
+      "base_sha256": "2a15d6b22fbe1def4d2bcd85568269d1157c5e1c298f0c6af43c1fb9797489ba",
+      "bytes": 7695
+    },
+    "vllm/models/qwen4_exp/nvidia/mtp.py": {
+      "sha256": "91f824ac4205e295ea48741ead8386a67a0e1d5d2eb9db0777f57afd0a0f0699",
+      "base_sha256": "928c450001ee42cae9f6b0d5e9dc477b63019af2e90baa77505659ea3334eb88",
+      "bytes": 18130
+    },
+    "vllm/models/qwen4_exp/nvidia/indexer_qsa.py": {
+      "sha256": "48b326748063319beb22299792ce8a2c0d8d4df57eb73d000fa274f2aac52467",
+      "base_sha256": "23a39cc4ee463bd3441e4343d9a0933ab1a81ac5a3f5a5af80f5b084f70d8fef",
+      "bytes": 19255,
+      "previous_sha256": "dd2b342a1859c5a3e4b5b97a0326bd0c8960a0297aaddc659a7b57dc272fdbe1"
+    },
+    "vllm/models/qwen4_exp/nvidia/ngram_embedding.py": {
+      "sha256": "5668661bc3c9faceff05d3891e665129d3e3b45fada59ed51bc71839a5583758",
+      "base_sha256": "f3aaf29281b803dcebb4b179d5177704ed7b913170edf8107e33f729be825429",
+      "bytes": 35320
+    },
+    "vllm/models/qwen4_exp/nvidia/qsa.py": {
+      "sha256": "4c5b707547b9fb7331ddfe9909159af358cbe4f6d7a327f627ceac78451acd28",
+      "base_sha256": "9ac72b0e5f02341704a2f5a49bf2f4a6f141d2e241e9db07ea5918592bac90ea",
+      "bytes": 23225,
+      "previous_sha256": "bb33e6f692cbdf53c75162646da9ff2a3e96d26fe1dc1a5a561bf1beb135d1cd"
+    },
+    "vllm/models/qwen4_exp/nvidia/qsa_capacity_scratch.py": {
+      "sha256": "fac81be035212e47aa8df8b7d34cffb417e14e2c68ec21920003348e0b49587b",
+      "base_sha256": null,
+      "bytes": 3478
+    },
+    "vllm/models/qwen4_exp/nvidia/hc_gemv_next.py": {
+      "sha256": "b3cbec178f8fddd19c59d700b109387a7e5fd1ce10cd884de4822237d0fb2f93",
+      "base_sha256": null,
+      "bytes": 2829
+    },
+    "vllm/models/qwen4_exp/nvidia/sm75_mtp_norm.py": {
+      "sha256": "fb4cf9c6341773c2b8923c586d9fb1f91e18555397e7bbd75601d1aa56342cda",
+      "base_sha256": null,
+      "bytes": 1055
+    },
+    "vllm/models/qwen4_exp/nvidia/ops/qsa_indexer.py": {
+      "sha256": "7eb2b247b88a747f73488f09897fe8b3f4eb1f97d65ccd1cc4211e8878b7ec38",
+      "base_sha256": "2c34883a6396bac0238f6308196854b653eadab8bbebbe7dd2d558e30d065cbb",
+      "bytes": 22751
+    },
+    "vllm/models/qwen4_exp/nvidia/ops/qsa_pre_indexer.py": {
+      "sha256": "c60c202ae39126af942c022a9ec5b19197976b4bd4d5fa30b2a7dc2a1f5e8c9b",
+      "base_sha256": "8af0b1979e5896569d3a4c11b0708013f1f93bb4c5cb1d98dafdd7fb52c64b70",
+      "bytes": 19208
+    },
+    "vllm/models/qwen4_exp/nvidia/ops/qsa.py": {
+      "sha256": "14414492bc857a43fb07be63ffa58772c5711cf212ead83dc3a6959d49e51ba2",
+      "base_sha256": "8327f0899e47b2c65d95b3f46bdb2db8fb09110f04c5c178850d0c256e22bc04",
+      "bytes": 34158
+    },
+    "vllm/models/qwen4_exp/nvidia/ops/qsa_fp8_storage.py": {
+      "sha256": "47c1ea8b97b3c83045bddba82bb9c020e957d0b9a89288cd51c6ff537f03ae86",
+      "base_sha256": null,
+      "bytes": 2285
+    },
+    "vllm/models/qwen4_exp/nvidia/ops/qsa_flashinfer_prefill.py": {
+      "sha256": "db1471a5caa4ea2d61157884d2010acb9c309641440a127bd9fb78b6b70a227a",
+      "base_sha256": null,
+      "bytes": 3732
+    },
+    "vllm/models/qwen4_exp/nvidia/ops/qsa_selected_prefill.py": {
+      "sha256": "93901f4c3b718640f975ef28bf1e590c406b94ad777b7d9d37ab231b72c6fe3e",
+      "base_sha256": null,
+      "bytes": 9629
+    },
+    "vllm/models/qwen4_exp/nvidia/ops/qsa_fp8_layout_audit.py": {
+      "sha256": "929d292bca3dd2e12b2e1295b8683bcb5a30e6007628ff8951e8136cba674ab8",
+      "base_sha256": null,
+      "bytes": 3951
+    },
+    "vllm/models/qwen4_exp/nvidia/ops/qsa_indexer_cublas.py": {
+      "sha256": "924980b518cb761bbff25d302d83020f9159e767542cd1af68ca54c638cf9ace",
+      "base_sha256": null,
+      "bytes": 7076
+    },
+    "vllm/models/qwen4_exp/nvidia/ops/qsa_selected_prefill_fp8.py": {
+      "sha256": "12af5eb4962fb05f59ef94e7c0dcf5fbf4bc294673f526b6db71cbea6d521e67",
+      "base_sha256": null,
+      "bytes": 10732
+    },
+    "vllm/model_executor/warmup/qwen4_exp_qsa_warmup.py": {
+      "sha256": "0c7338eb2a4e5de99cede7b92f80d07c80104ae046962681eca8c127beee6a4c",
+      "base_sha256": "ea84db483e9e6a84287639d08bd02743be8efc474c441f42fcc34198204d3ce6",
+      "bytes": 4797
+    },
+    "vllm/models/qwen4_exp/nvidia/ops/qsa_mixed_prefill.py": {
+      "sha256": "e2bfa492e28e0be73923ba9356a6e7f2837282263fa5a36a703e49cbb56c169e",
+      "base_sha256": null,
+      "bytes": 6193
+    }
+  },
+  "revision": "2026-10-04 grouped mixed prefill"
+}

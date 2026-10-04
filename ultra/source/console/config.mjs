@@ -1,5 +1,6 @@
 import {validateLMCacheProfile, lmcacheConnectorArgs} from './public/lmcache-config.js';
 import {argValue, setArg, validateContextArgs, GiB} from './public/context-config.js';
+import {runtimeEngineEnvironment} from './runtime-settings.mjs';
 import path from 'node:path';
 import fs from 'node:fs';
 
@@ -20,7 +21,7 @@ export function flashinferWorkspace(root, mkdir = false) {
 
 export function cacheLayout(root, format='fp8') {
   if (!path.isAbsolute(root)) throw Error('缓存根目录必须是绝对路径');
-  if (!['fp8','awq','kat'].includes(format)) throw Error('未知模型格式');
+  if (!['fp8','awq','kat','fp16','bf16','int8','gptq','nvfp4','custom'].includes(format)) throw Error('未知模型格式');
   return Object.fromEntries(Object.entries({
     VLLM_CACHE_ROOT:`${format}/vllm`, TRITON_CACHE_DIR:`${format}/triton`,
     TORCH_EXTENSIONS_DIR:'shared/torch_extensions',
@@ -38,7 +39,7 @@ export function validateProfile(p) {
   if (!Number.isInteger(p.port)||p.port<1024||p.port>65535) throw Error('端口范围 1024–65535');
   if (!['docker','native'].includes(p.backend||'docker')) throw Error('未知运行方式');
   if (p.args.some(a=>a==='--api-key'||a.startsWith('--api-key='))) throw Error('API key 由服务端管理');
-  if(p.backend!=='native' && p.image && !p.image.startsWith('local/vllm-sm75:v015-')) throw Error('本地候选阶段仅运行 v015 独立镜像');
+  if(p.backend!=='native' && p.image && !/^(?:local\/)?vllm-sm75(?:-ultra)?[:/]/.test(p.image)) throw Error('请选择 vLLM-SM75 镜像');
   if(!p.power)p.power={mode:'pstate',idleSeconds:1,util:5,confirm:60,low:8,high:16,poll:5,gpus:'0,1,2,3'};
   if(p.power){
     const q=p.power,m=q.mode||'pstate';
@@ -71,7 +72,7 @@ export function makeCommand(profile, apiKey, options={}) {
   const p=validateProfile(profile), name=`sm75-v015-test-${p.id}`;
   const layout=cacheLayout(p.cacheRoot,p.format);
   if (options.mkdir) for(const v of Object.values(layout)) fs.mkdirSync(v,{recursive:true});
-  const env={NCCL_P2P_LEVEL:process.env.NCCL_P2P_LEVEL ?? 'SYS',...p.env,VLLM_API_KEY:apiKey,VLLM_MONITOR:'1'};
+  const env={...runtimeEngineEnvironment(p.env, options.environment || process.env),VLLM_API_KEY:apiKey,VLLM_MONITOR:'1'};
   if (p.backend==='native') {
     const base=flashinferWorkspace(p.cacheRoot, options.mkdir);
     const args=lmcacheConnectorArgs(p);const i=args.indexOf('--port');if(i>=0)args[i+1]=String(p.port);else args.push('--port',String(p.port));
@@ -95,7 +96,7 @@ export function makeCommand(profile, apiKey, options={}) {
     args.push('--env',k==='VLLM_API_KEY'?k:`${k}=${v}`);
   }
   const modelArgs=[...p.args];if(sharedNetwork){const i=modelArgs.indexOf('--port');if(i>=0)modelArgs[i+1]=String(p.port);else modelArgs.push('--port',String(p.port));}
-  args.push(p.image||'local/vllm-sm75:v015-candidate-20260912',...modelArgs);
+  args.push(p.image||'vllm-sm75:v0.1.7-beta',...modelArgs);
   return {name,bin:'docker',args,env};
 }
 

@@ -28,7 +28,7 @@ function element() {
     set innerHTML(value) {
       this.html = value;
       if (value.includes('class="bar"')) {
-        for (const key of [".bar", ".status", ".engine", ".power"]) this.parts[key] = element();
+        for (const key of [".bar", ".status", ".engine", ".power", ".short"]) this.parts[key] = element();
       } else {
         for (const key of [".label", "b", ".unit"]) this.parts[key] = element();
       }
@@ -56,7 +56,7 @@ test("sampling updates all eight metrics in place and retains their units and un
     assert.equal(requests[0].options.cache, "no-store");
     assert.deepEqual(cells.map(cell => cell.dataset.metric), ["temperature", "power", "utilization", "memory", "prefill", "decode", "kv", "cacheHit"]);
     assert.deepEqual(cells.map(cell => cell.parts[".unit"].textContent), ["°C", "W", "%", "%", "tok/s", "tok/s", "%", "%"]);
-    assert.equal(cells[4].parts.b.textContent, (1234.5).toLocaleString(undefined, {maximumFractionDigits: 1}));
+    assert.equal(cells[4].parts.b.textContent, "1.2K");
     assert.equal(cells[0].parts.b.dataset.level, "medium");
     assert.equal(cells[2].parts.b.dataset.level, "high");
     assert.equal(cells[6].parts.b.dataset.level, "elevated");
@@ -69,6 +69,8 @@ test("sampling updates all eight metrics in place and retains their units and un
     assert.equal(cells[4].parts.b.textContent, "—");
     assert.equal(cells[4].parts.b.dataset.level, "unknown");
     assert.equal(root.parts[".engine"].textContent, "运行·待采样");
+    assert.equal(root.parts[".short"].textContent, "待采样");
+    assert.match(root.parts[".status"].title, /运行·待采样/);
     assert.match(root.parts[".status"].title, /等待新采样/);
   } finally {
     stop?.();

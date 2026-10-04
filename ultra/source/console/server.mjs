@@ -1,3 +1,7 @@
+import {inferenceProfiles} from './inference-profiles.mjs';
+import {applyRuntimeEnvironment, hasRuntimeOverrides} from './runtime-settings.mjs';
+import {waitForEngine} from './engine-ready.mjs';
+import {modelFormat, createModelDraft, preflightModel} from './model-launch.mjs';
 import {ManagedLMCache, preflightLMCache, lmcachePlan, lmcacheEnvironment, terminateLMCacheProcess} from './lmcache-runtime.mjs';
 import {modelContext, retargetContextModel} from './public/context-config.js';
 import { harnessVersion } from "./apply-branding.mjs";
@@ -8,7 +12,7 @@ import { switchModel } from "./switch-model.mjs";
 import { validateSampling } from "./sampling.mjs";
 import { modelSamplingDefaults } from "./sampling-defaults.mjs";
 import { deleteModelFiles } from "./model-delete.mjs";
-import { OriginalTests } from "./original-tests.mjs";
+import { OriginalTests, injectFrameAppearance } from "./original-tests.mjs";
 import { chatConfig } from "./chat-config.mjs";
 import http from "node:http";
 import fs from "node:fs";
@@ -54,7 +58,19 @@ if (!fs.existsSync(accessFile))
     }),
     { mode: 0o600, flag: "wx" },
   );
-const engineKey = () => {
+// Match standard Docker's credential setting once at startup. Subsequent
+// changes in the panel remain effective until the container restarts.
+if (process.env.VLLM_API_KEY) {
+  const suppliedKey = process.env.VLLM_API_KEY;
+  if (suppliedKey.length < 8 || suppliedKey.length > 512 || /[\s\x00-\x1f]/.test(suppliedKey))
+    throw Error("VLLM_API_KEY 需要 8–512 位且不含空白");
+  fs.writeFileSync(accessFile + '.tmp', JSON.stringify({key:suppliedKey}), {mode:0o600});
+  fs.renameSync(accessFile + '.tmp', accessFile);
+}
+const standalone =
+  process.env.SM75_SINGLE_CONTAINER === "1"
+    ? new Standalone(root, key, {onEngineChange: () => syncEngineKeyFile()}) : null;
+const configuredEngineKey = () => {
   try {
     const k = JSON.parse(
       fs.readFileSync(path.join(root, "api-access.json"), "utf8"),
@@ -64,17 +80,16 @@ const engineKey = () => {
     return key;
   }
 };
+const engineKey = () => standalone?.engine?.apiKey || configuredEngineKey();
 const syncEngineKeyFile = () => {
   try {
-    fs.writeFileSync(path.join(root, "engine-key.current"), engineKey(), {
-      mode: 0o600,
-    });
+    const file = path.join(root, "engine-key.current");
+    fs.writeFileSync(file + ".tmp", engineKey(), {mode: 0o600});
+    fs.renameSync(file + ".tmp", file);
   } catch {}
 };
 syncEngineKeyFile();
 const originalTests = new OriginalTests(root, store, engineKey);
-const standalone =
-  process.env.SM75_SINGLE_CONTAINER === "1" ? new Standalone(root, key) : null;
 const attachments = new Attachments(root);
 const profilesPath = path.join(root, "profiles.json");
 let profiles = fs.existsSync(profilesPath)
@@ -270,7 +285,7 @@ async function launchDownload(repo, provider, options = {}) {
     `${modelRoot}:/downloads`,
     "--entrypoint",
     "python3",
-    "local/vllm-sm75:v015-candidate-20260912",
+    "vllm-sm75:v0.1.7-beta",
     "-c",
     script,
     repo,
@@ -414,9 +429,8 @@ function modelCatalog() {
       if (!fs.existsSync(file)) return;
       const cfg = JSON.parse(fs.readFileSync(file));
       const quant = String(cfg.quantization_config?.quant_method || "");
-      const kind =
-        format ||
-        (quant.includes("awq") ? "awq" : quant.includes("fp8") ? "fp8" : "kat");
+      const detected = modelFormat(cfg);
+      const kind = detected;
       const old = found.get(actual);
       found.set(actual, {
         ...old,
@@ -464,14 +478,36 @@ async function start(p) {
     const st = await status(p);
     if (st.running) return st;
     // Check optional dependencies and disk before switchModel can stop the current engine.
+    preflightModel(p, {cards:await gpu()});
     const cacheCheck = await preflightLMCache(p, {standalone: !!standalone,
       ownedPorts: standalone?.lmcache.child ? standalone.lmcache.ports : []});
     if (shuttingDown) throw Error("管理服务正在关闭");
+    if (standalone?.engine && standalone.engine.id !== p.id) {
+      const response = await fetch('http://127.0.0.1:8000/metrics',{headers:{Authorization:'Bearer '+engineKey()},signal:AbortSignal.timeout(3000)}).catch(()=>null);
+      if (response?.ok && /^vllm:num_requests_(?:running|waiting)(?:\{[^}]*\})?\s+[1-9]/m.test(await response.text()))
+        throw Error('当前模型仍有请求，请等待回复结束或取消请求后切换');
+      if (standalone.harness) await standalone.assertHarnessIdle();
+    }
     if (standalone)
       return await switchModel(p, {
         current: standalone.engine,
         stop: (old) => standalone.stop(old),
-        start: (target) => standalone.start(target),
+        start: async (target) => {
+          standalone.lastStartError = null;
+          try {
+            await standalone.start(target);
+            const engine = standalone.engine;
+            await waitForEngine(target,{key:engineKey(),alive:()=>!shuttingDown && standalone.engine === engine && engine.child.exitCode === null && engine.child.signalCode == null});
+            engine.phase = 'ready';
+            let warning;
+            if (standalone.harness) try {await standalone.updateHarnessModel(target);} catch {warning='模型已就绪，工作台连接更新失败；请重新打开工作台重试';}
+            return {...standalone.status(target), ...(warning ? {warning} : {})};
+          } catch (error) {
+            standalone.lastStartError = error.message;
+            await standalone.stop(target);
+            throw error;
+          }
+        },
         gpus: gpu,
       });
     const devices = await gpu();
@@ -714,6 +750,8 @@ const server = http.createServer(async (req, res) => {
       u.pathname === "/console-ui" ||
       u.pathname === "/" ||
       u.pathname === "/app.js" ||
+      u.pathname === "/api-access-ui.js" ||
+      u.pathname === "/appearance-bootstrap.js" ||
       u.pathname === "/live-summary.js" ||
       u.pathname === "/context-config.js" ||
       u.pathname === "/lmcache-config.js" ||
@@ -723,6 +761,8 @@ const server = http.createServer(async (req, res) => {
         "/console-ui": "index.html",
         "/": "index.html",
         "/app.js": "app.js",
+        "/api-access-ui.js": "api-access-ui.js",
+        "/appearance-bootstrap.js": "appearance-bootstrap.js",
         "/live-summary.js": "live-summary.js",
         "/context-config.js": "context-config.js",
         "/lmcache-config.js": "lmcache-config.js",
@@ -958,29 +998,33 @@ const server = http.createServer(async (req, res) => {
           u.searchParams.get("page") || 1,
         ),
       );
-    if (u.pathname === "/api/api-access") {
-      const file = path.join(root, "api-access.json");
-      if (req.method === "POST") {
-        if (
-          typeof b.key !== "string" ||
-          b.key.length < 8 ||
-          b.key.length > 512 ||
-          /[\s\x00-\x1f]/.test(b.key)
-        )
-          throw Error("API Key 需要 8–512 位且不含空白");
-        fs.writeFileSync(file, JSON.stringify({ key: b.key }), { mode: 0o600 });
-        fs.chmodSync(file, 0o600);
-        syncEngineKeyFile();
-        return json(res, { configured: true, restartRequired: true });
+    if (["/api/api-access", "/api/api-access/reveal"].includes(u.pathname)) {
+      const saved = configuredEngineKey();
+      const active = standalone?.engine?.apiKey;
+      const details = {configured:!!saved, running:!!active, pending:!!active && active !== saved,
+        port:profiles.find(p=>p.id===standalone?.engine?.id)?.port || 8000};
+      if (u.pathname.endsWith('/reveal')) {
+        if (req.method !== 'POST') return json(res,{error:'请使用查看或复制按钮'},405);
+        if (b.source && !['current','saved'].includes(b.source)) return json(res,{error:'无效的密钥来源'},400);
+        return json(res,{...details,key:b.source === 'saved' ? saved : active || saved});
       }
-      return json(res, { configured: fs.existsSync(file) });
+      if (req.method === "POST") {
+        if (typeof b.key !== "string" || b.key.length < 8 || b.key.length > 512 || /[\s\x00-\x1f]/.test(b.key))
+          throw Error("API Key 需要 8–512 位且不含空白");
+        fs.writeFileSync(accessFile,JSON.stringify({key:b.key}),{mode:0o600});
+        fs.chmodSync(accessFile,0o600);
+        syncEngineKeyFile();
+        return json(res,{configured:true,restartRequired:!!active && active !== b.key});
+      }
+      if (req.method !== 'GET') return json(res,{error:'请求方式不支持'},405);
+      return json(res,details);
     }
     if (u.pathname === "/api/settings") {
       return json(
         res,
         req.method === "POST"
           ? store.saveSettings(b, profiles)
-          : store.settings(),
+          : {...store.settings(), runtimeEnvironment:store.get("startup", "environment")},
       );
     }
     if (u.pathname === "/api/templates") {
@@ -990,7 +1034,7 @@ const server = http.createServer(async (req, res) => {
           store.saveTemplate(b.name, validateProfile(b.profile), b.id),
         );
       return json(res, {
-        recommended: presets,
+        recommended: [...presets,...inferenceProfiles().map(p=>({id:p.id,name:p.name,modelProfile:true}))],
         personal: store.list("template"),
       });
     }
@@ -1073,42 +1117,32 @@ const server = http.createServer(async (req, res) => {
     }
     if (u.pathname === "/api/models/register" && req.method === "POST")
       return json(res, store.registerModel(b.path, b.name));
-    if (u.pathname === "/api/models/use" && req.method === "POST") {
-      const model = modelCatalog().find((m) => m.id === b.model);
+    if (["/api/models/draft", "/api/models/use"].includes(u.pathname) && req.method === "POST") {
+      const model = modelCatalog().find(m => m.id === b.model);
       if (!model) throw Error("本地模型不存在");
-      const original = b.template?.startsWith("personal:")
-        ? store.get("template", b.template.slice(9))?.profile
-        : profile(b.template);
-      if (!original) throw Error("模板不存在");
-      if (model.format !== original.format)
-        throw Error("模型格式与配置模板不匹配");
-      let p;
-      if (
-        original.args[0] === model.path &&
-        profiles.some((p) => p.id === original.id)
-      ) {
-        p = profile(original.id);
-      } else {
-        p = unifiedProfile({
-          ...structuredClone(original),
-          id: "personal-" + crypto.randomUUID().slice(0, 8),
-          name: model.name + " · " + (original.name || "我的配置"),
-        });
-        p.args = retargetContextModel(p.args, model.path, model.context);
-        validateProfile(p);
-        profiles.push(p);
-        save();
+      let original = b.source ? validateProfile(unifiedProfile(b.source)) : null;
+      if (!original && b.template && !b.template.startsWith('base:') && b.template !== 'custom') {
+        original = b.template.startsWith('personal:') ? store.get('template',b.template.slice(9))?.profile : profile(b.template);
+        if (!original) throw Error('模板不存在');
       }
-      const i = p.args.indexOf("--speculative-config");
-      if (i >= 0) {
-        const spec = JSON.parse(p.args[i + 1]);
-        if (
-          spec.method === "dflash" &&
-          !fs.existsSync(path.join(spec.model || "", "config.json"))
-        )
-          throw Error("请先在模型库下载或导入匹配的 DFLASH2 草稿模型");
-      }
-      return json(res, { profile: p.id, ...(b.start ? await start(p) : {}) });
+      const result = createModelDraft(model, original, {settings:store.settings(), cards:await gpu(),
+        preset:b.template === 'custom' ? 'custom' : b.template?.startsWith('base:') ? b.template.slice(5) : 'default', standalone:!!standalone});
+      result.profile = validateProfile(unifiedProfile(result.profile));
+      if (u.pathname.endsWith('/draft')) return json(res,result);
+      // Legacy callers still receive a saved profile, after all preflight checks.
+      preflightModel(result.profile,{requireWeights:!!b.start});
+      profiles.push(result.profile); save();
+      return json(res,{profile:result.profile.id,...(b.start ? await start(result.profile) : {})});
+    }
+    if (u.pathname === '/api/profiles/validate' && req.method === 'POST') {
+      const p = validateProfile(unifiedProfile(b));
+      preflightModel(p,{cards:await gpu()});
+      await preflightLMCache(p,{standalone:!!standalone,ownedPorts:standalone?.lmcache.child ? standalone.lmcache.ports : []});
+      return json(res,{ok:true});
+    }
+    if (u.pathname === '/api/runtime' && req.method === 'GET') {
+      const id = standalone?.engine?.id || null;
+      return json(res,{profile:id,phase:standalone?.engine?.phase || 'stopped',error:standalone?.lastStartError || null});
     }
     if (u.pathname === "/api/power/p8" && req.method === "POST") {
       const cur = standalone?.engine?.id;
@@ -1323,7 +1357,7 @@ const server = http.createServer(async (req, res) => {
           "Content-Type": "text/html; charset=utf-8",
           "Cache-Control": "no-store",
         });
-        return res.end(html);
+        return res.end(injectFrameAppearance(html));
       }
       if (action === "chat" && req.method === "POST")
         return await proxy(req, res, p, "/v1/chat/completions", {
@@ -1407,7 +1441,10 @@ const server = http.createServer(async (req, res) => {
       req.method === "POST"
     ) {
       harnessCookie = "";
-      await standalone.startHarness(profile(b.profile));
+      const running = standalone.engine?.id;
+      const chosen = profiles.find(p => p.id === (running || b.profile)) || profiles[0]
+        || {id:'offline',args:['sm75-local'],port:8000};
+      await standalone.startHarness(chosen);
       await waitHarnessReady();
       return json(res, { url: "/harness-ui/" });
     }
@@ -1433,12 +1470,50 @@ const server = http.createServer(async (req, res) => {
     else res.end();
   }
 });
+// Import Docker settings once before listening. Later edits in the panel are
+// authoritative until the next manager start; never reapply env per launch.
+let runtimeImportError = null;
+if (standalone && (hasRuntimeOverrides(process.env) || process.env.SM75_LAUNCH_PROFILE)) {
+  try {
+    const settings = store.settings();
+    const boot = process.env.SM75_LAUNCH_PROFILE ? JSON.parse(process.env.SM75_LAUNCH_PROFILE) : null;
+    const targetId = boot?.id || process.env.SM75_DEFAULT_PROFILE || settings.defaultProfile;
+    const matchingModel = process.env.MODEL ? profiles.filter(p => p.args[0] === process.env.MODEL) : [];
+    if (!targetId && matchingModel.length > 1) throw Error("同一模型有多个配置，请指定 SM75_DEFAULT_PROFILE");
+    let selected = boot || (targetId ? profiles.find(p => p.id === targetId)
+      : matchingModel[0] || (!process.env.MODEL && profiles.length === 1 ? profiles[0] : null));
+    if (targetId && !selected) throw Error("Docker 指定的默认运行配置不存在");
+    if (process.env.MODEL && (!selected || selected.args[0] !== process.env.MODEL)) {
+      let config = {};
+      try {config = JSON.parse(fs.readFileSync(path.join(process.env.MODEL, 'config.json'), 'utf8'));} catch {}
+      const draft = createModelDraft({path:process.env.MODEL,
+        name:process.env.SERVED_MODEL_NAME || path.basename(process.env.MODEL),
+        format:modelFormat(config)}, selected, {settings, standalone:true}).profile;
+      const tp = Number(process.env.TENSOR_PARALLEL_SIZE);
+      if (!selected && !Object.hasOwn(process.env, 'PSTATE_GPUS') && Number.isInteger(tp) && tp > 0 && tp <= 256)
+        draft.power.gpus = Array.from({length:tp}, (_, index) => String(index)).join(',');
+      selected = selected ? {...draft,id:selected.id,name:selected.name} : draft;
+    }
+    if (!selected) throw Error("Docker 启动参数需要 MODEL 或已选择的默认运行配置");
+    const imported = validateProfile(unifiedProfile(applyRuntimeEnvironment(selected, process.env)));
+    const old = profiles.findIndex(p => p.id === imported.id);
+    if (old >= 0) profiles[old] = imported; else profiles.push(imported);
+    save();
+    if (boot || !settings.defaultProfile || process.env.SM75_DEFAULT_PROFILE)
+      store.saveSettings({defaultProfile:imported.id,...(boot ? {autoStart:true} : {})}, profiles);
+    store.put('startup','environment',{state:'applied',profile:imported.id,time:Date.now()});
+  } catch (error) {
+    runtimeImportError = error;
+    store.put('startup','environment',{state:'failed',time:Date.now(),error:error.message});
+    console.error('Docker 启动参数导入失败：', error.message);
+  }
+}
 server.listen(port, host, async () => {
   console.log(
     `SM75 console http://${host}:${port}; login token file: ${secretPath}`,
   );
   const settings = store.settings();
-  if (settings.autoStart)
+  if (settings.autoStart && !runtimeImportError)
     try {
       await start(profile(settings.defaultProfile));
       store.put("startup", "last", {

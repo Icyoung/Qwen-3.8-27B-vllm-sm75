@@ -18,3 +18,10 @@ ultra/source/lmcache/patches/LICENSE text eol=lf
 .gitattributes text eol=lf
 .gitignore text eol=lf
 .dockerignore text eol=lf
+
+# The Next installer verifies exact payload bytes against its SHA256 manifest.
+# Preserve the tested payload, including files captured with CRLF endings.
+docker/next/overlay/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+docker/next/templates/*.jinja text eol=lf
+docker/helpers/runtime-env.list text eol=lf
+docs/models/*.sha256 text eol=lf

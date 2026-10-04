@@ -30,6 +30,8 @@ export function harnessPatch(config) {
     // the native first-use directory policy, not a Workspace registry edit.
     // Native initializeDefault reuses existing workspaces without renaming them.
     {id: 'workspace-controller', config: {documentsDirectory: '/dsh/workspace'}},
+    // The upstream web profile disables its query index while exposing search.
+    {id: 'session-query-sqlite', config: {path: '/dsh/home/indexes/session-search.sqlite', openAt: 'first-search'}},
     {insert: [
       {id: 'sm75-workbench', name: 'sm75-workbench', config},
       {id: 'sm75-brand', name: 'sm75-brand'},

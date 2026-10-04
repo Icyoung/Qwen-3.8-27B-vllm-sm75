@@ -1,0 +1,45 @@
+# Rebuild the complete Ultra from an existing audited release, using one output
+# image. No opt1/opt2/RC image name or separately tagged core image is required.
+ARG BASE_IMAGE=vllm-sm75:v0.1.7-ultra-beta
+FROM ${BASE_IMAGE}
+ARG SOURCE_SHA256
+ARG RELEASE_VERSION=0.1.7-ultra-beta
+
+COPY vllm /tmp/sm75-release/vllm
+COPY docker/helpers /tmp/sm75-release/helpers
+COPY docker/speculative /opt/vllm-sm75/speculative
+RUN python3 /tmp/sm75-release/helpers/verify_cuda_libraries.py && \
+    python3 /tmp/sm75-release/helpers/install_sm75_overlay.py /tmp/sm75-release/vllm --source-copy /opt/vllm-sm75/source/vllm && \
+    python3 /tmp/sm75-release/helpers/install_speculative.py && \
+    python3 /tmp/sm75-release/helpers/verify_sm75_image.py
+COPY docker/next /opt/vllm-sm75/next
+RUN python3 /opt/vllm-sm75/next/install.py
+COPY docker/next/templates /opt/vllm-sm75/templates
+COPY ultra/source/profiles /opt/vllm-sm75/profiles
+COPY ultra/source/lmcache /opt/vllm-sm75/lmcache
+COPY ultra/source/console/lmcache_probe.py /opt/vllm-sm75/console/lmcache_probe.py
+COPY docker/helpers/lmcache-entrypoint.sh docker/helpers/lmcache-launch.py \
+     docker/helpers/runtime-entrypoint.py docker/helpers/pstate-entrypoint.sh /opt/vllm-sm75/
+COPY ultra/source /opt/sm75-workbench
+COPY ultra/overlay/font-scale.py /opt/vllm-sm75/font-scale.py
+COPY ultra/overlay/pstate-supervisor.sh /opt/vllm-sm75/pstate-supervisor.sh
+COPY build-dependencies/harness-theme.tgz /tmp/harness-theme.tgz
+RUN node -e 'const fs=require("fs");if(process.version!=="v22.23.2"||JSON.parse(fs.readFileSync("/opt/harness/node_modules/@deepseek-ai/dsh/package.json")).version!=="0.1.7-alpha.2")throw Error("Unreviewed Ultra dependencies")' && \
+    rm -rf /opt/harness/node_modules/@deepseek-ai/dsh-client-ui-theme && \
+    mkdir -p /opt/harness/node_modules/@deepseek-ai/dsh-client-ui-theme && \
+    tar -xzf /tmp/harness-theme.tgz -C /opt/harness/node_modules/@deepseek-ai/dsh-client-ui-theme --strip-components=1 && \
+    python3 /opt/vllm-sm75/font-scale.py && \
+    node /opt/sm75-workbench/console/install-native-plugins.mjs && \
+    node /opt/sm75-workbench/console/verify-client-bundles.mjs && \
+    chmod +x /opt/vllm-sm75/*entrypoint* /opt/vllm-sm75/pstate-supervisor.sh && \
+    rm -rf /tmp/sm75-release /tmp/harness-theme.tgz
+ENV SM75_EDITION=ultra SM75_SINGLE_CONTAINER=1 \
+    SM75_CONSOLE_HOST=0.0.0.0 SM75_CONSOLE_PORT=1615 \
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility NCCL_P2P_LEVEL=SYS
+LABEL org.opencontainers.image.version="${RELEASE_VERSION}" \
+      org.opencontainers.image.title="VLLM-SM75 Ultra" \
+      io.sm75.source-sha256="${SOURCE_SHA256}"
+EXPOSE 1615 8000
+WORKDIR /opt/sm75-workbench
+ENTRYPOINT ["python3", "/opt/vllm-sm75/runtime-entrypoint.py"]
+CMD []
