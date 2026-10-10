@@ -1,3 +1,17 @@
+# v0.1.7 beta2 单镜像构建
+
+默认交付 `vllm-sm75:v0.1.7-ultra-beta2`，包含统一推理核心、Ultra 控制台和 BenchLocal 九项测试全部依赖。
+
+```bash
+EDITION=ultra MAX_JOBS=1 bash docker/build.sh
+```
+
+使用 `docker/Dockerfile.ultra-full` 内部多阶段构建，最终只产生一个 Ultra 标签。无需分别构建三个 BenchLocal 执行镜像。已有兼容 Ultra 基础环境可使用 `docker/Dockerfile.ultra`，它将源码与依赖合并为一个新层；若旧镜像已达到 Docker 层数上限，使用完整构建入口。
+
+BenchLocal 的 Hermes Python 包装入独立 venv，不修改推理环境的 Torch / CUDA 包。工具链和浏览器下载需通过随源码保存的 SHA256 校验。完整构建需要 Linux x86_64、Docker / BuildKit 和官方下载源访问；Unraid 仍需按下方隔离流程控制构建资源。
+
+---
+
 # 构建与启动
 
 > 完整构建和临时停止相关模型容器均允许，前提是不拖垮宿主 Docker 服务、不影响无关容器，并能恢复原功能。此前未隔离的完整层导出引发故障，`docker/build.sh` 暂时拦截该 Unraid 路径；已验证的隔离构建过程见 [完整构建记录](../docs/validation/2026-09-18-isolated-full-build.md)；通用入口仍不允许生产 Unraid 的未隔离完整导出。完整构建使用独立构建机，UI 迭代使用下面的资源受限增量模式。不能只停模型后原样重试事故命令。

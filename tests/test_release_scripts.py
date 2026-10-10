@@ -22,7 +22,7 @@ class ReleaseScripts(unittest.TestCase):
             fake.chmod(0o755)
             logfile = directory / 'calls'
             env = {**os.environ, 'PATH': str(directory) + os.pathsep + os.environ['PATH'],
-                   'COMMAND_LOG': logfile.as_posix(), 'SOURCE_REVISION': 'test-source',
+                   'COMMAND_LOG': logfile.as_posix(), 'SOURCE_REVISION': 'test-source', 'BENCHLOCAL':'0',
                    'VLLM_API_KEY': 'synthetic-test-key', 'VLLM_SM75_CACHE_ROOT': '/tmp/sm75-test-cache',
                    **settings}
             env = {key: value for key, value in env.items() if value is not None}
@@ -33,11 +33,19 @@ class ReleaseScripts(unittest.TestCase):
 
     def test_standard_and_ultra_build_tags_share_version(self):
         version = (ROOT / 'docker/VERSION').read_text().strip()
-        ultra_version = version.removesuffix('-beta') + '-ultra-beta' if version.endswith('-beta') else version + '-ultra'
+        ultra_version = version.replace('-beta','-ultra-beta',1) if '-beta' in version else version + '-ultra'
         for edition, expected in [('standard', version), ('ultra', ultra_version)]:
             result, args = self.invoke('docker/build.sh', EDITION=edition, BUILD_MODE='full')
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn('vllm-sm75:v' + expected, args)
+
+    def test_standard_mode_reuses_unified_image_and_keeps_shm_override(self):
+        result,args=self.invoke('docker/run.sh',EDITION='standard',POWER_MODE='sleep',CPU_KV_GIB='0',SHM_SIZE='48g')
+        self.assertEqual(result.returncode,0,result.stderr)
+        version=(ROOT/'docker/VERSION').read_text().strip().replace('-beta','-ultra-beta',1)
+        self.assertIn('vllm-sm75:v'+version,args)
+        self.assertIn('SM75_EDITION=standard',args)
+        self.assertEqual(args[args.index('--shm-size')+1],'48g')
 
     def test_public_shell_launchers_use_linux_line_endings(self):
         for path in (ROOT / 'docker').rglob('*.sh'):

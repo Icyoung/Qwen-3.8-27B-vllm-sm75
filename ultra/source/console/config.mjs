@@ -1,3 +1,4 @@
+import {recommendedShmGiB} from './cpu-kv-resources.mjs';
 import {validateLMCacheProfile, lmcacheConnectorArgs} from './public/lmcache-config.js';
 import {argValue, setArg, validateContextArgs, GiB} from './public/context-config.js';
 import {runtimeEngineEnvironment} from './runtime-settings.mjs';
@@ -79,7 +80,7 @@ export function makeCommand(profile, apiKey, options={}) {
     return {name,bin:options.vllmBin||'vllm',args:['serve',...args],env:{...env,...layout,FLASHINFER_WORKSPACE_BASE:base}};
   }
   const args=['run','--detach','--name',name,'--label','sm75.managed=v015-candidate',
-    '--gpus',p.gpus||'all','--shm-size','16g'];
+    '--gpus',p.gpus||'all','--shm-size',`${recommendedShmGiB(p)}g`];
   const sharedNetwork=options.engineNetwork||process.env.SM75_ENGINE_NETWORK;
   if(sharedNetwork){if(!/^container:sm75-v015-test-[a-z0-9-]+$/.test(sharedNetwork))throw Error('无效候选网络');args.push('--network',sharedNetwork);}else args.push('--publish',`${p.port}:8000`);
   const binds=p.binds||[];
@@ -96,7 +97,7 @@ export function makeCommand(profile, apiKey, options={}) {
     args.push('--env',k==='VLLM_API_KEY'?k:`${k}=${v}`);
   }
   const modelArgs=[...p.args];if(sharedNetwork){const i=modelArgs.indexOf('--port');if(i>=0)modelArgs[i+1]=String(p.port);else modelArgs.push('--port',String(p.port));}
-  args.push(p.image||'vllm-sm75:v0.1.7-beta',...modelArgs);
+  args.push(p.image||'vllm-sm75:v0.1.7-beta2',...modelArgs);
   return {name,bin:'docker',args,env};
 }
 

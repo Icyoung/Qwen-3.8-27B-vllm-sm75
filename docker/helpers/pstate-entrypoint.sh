@@ -7,6 +7,14 @@ set -euo pipefail
 # Keep the tested SM75 TP communication default; explicit overrides win.
 export NCCL_P2P_LEVEL="${NCCL_P2P_LEVEL-SYS}"
 
+# Reject an undersized native CPU KV pool before starting GPU power control.
+if [[ -f /opt/vllm-sm75/cpu-kv-check.py ]]; then
+  python3 - "$@" <<'PY'
+import runpy, sys
+runpy.run_path('/opt/vllm-sm75/cpu-kv-check.py')['check'](sys.argv[1:], {})
+PY
+fi
+
 PSTATE_PID=""
 if command -v pstate-supervisor.sh >/dev/null 2>&1; then
   pstate-supervisor.sh &

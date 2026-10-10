@@ -1,6 +1,6 @@
 # Flash Next TP8 完整使用说明
 
-适用版本：`vllm-sm75:v0.1.7-ultra-beta`。目标模型：`albucino/Qwen3.8-Flash-Next-W4A16-FP8PLE`。本说明更新至2026-10-04的8×Tesla T10实测配置，包含构建、模型准备、1615面板及API启动、参数、工具调用和性能复核。
+适用版本：`vllm-sm75:v0.1.7-ultra-beta2`。目标模型：`albucino/Qwen3.8-Flash-Next-W4A16-FP8PLE`。本说明更新至2026-10-04的8×Tesla T10实测配置，包含构建、模型准备、1615面板及API启动、参数、工具调用和性能复核。
 
 推荐组合是 **TP8＋EP、QSA开启、FP8 KV、MTP3、单路256K、并发4混合长度**。基础运行与Ultra使用相同推理核心；下面以带完整面板的Ultra为主。
 
@@ -36,12 +36,12 @@
 
 ## 2. 保存、构建与使用唯一正式镜像
 
-本项目统一使用`vllm-sm75:v0.1.7-ultra-beta`。它包含Next、27B FP8/AWQ、MTP/DFlash2及完整控制台，运行时无需保留opt1、opt2、RC或其他Next专用镜像。
+本项目统一使用`vllm-sm75:v0.1.7-ultra-beta2`。它包含Next、27B FP8/AWQ、MTP/DFlash2及完整控制台，运行时无需保留opt1、opt2、RC或其他Next专用镜像。
 
 使用本次beta源码：
 
 ```bash
-git clone --branch v0.1.7-beta --single-branch https://github.com/fishensw/VLLM-SM75.git
+git clone --branch v0.1.7-beta2 --single-branch https://github.com/fishensw/VLLM-SM75.git
 cd VLLM-SM75
 export SOURCE_ROOT="$PWD"
 ```
@@ -50,10 +50,10 @@ export SOURCE_ROOT="$PWD"
 
 ```bash
 cd "$SOURCE_ROOT"
-docker image inspect vllm-sm75:v0.1.7-ultra-beta --format '{{.Id}}'
-docker build --network none -f docker/Dockerfile.ultra \
-  --build-arg BASE_IMAGE=vllm-sm75:v0.1.7-ultra-beta \
-  -t vllm-sm75:v0.1.7-ultra-beta .
+docker image inspect vllm-sm75:v0.1.7-ultra-beta2 --format '{{.Id}}'
+docker build -f docker/Dockerfile.ultra \
+  --build-arg BASE_IMAGE=vllm-sm75:v0.1.7-ultra-beta2 \
+  -t vllm-sm75:v0.1.7-ultra-beta2 .
 ```
 
 该入口重新安装统一推理适配、Next优化和面板源码，并执行安装校验，最终只产生一个正式标签。基础镜像是构建输入；构建完成的镜像包含运行所需文件，不在启动时查找opt2或其他镜像。
@@ -63,9 +63,9 @@ docker build --network none -f docker/Dockerfile.ultra \
 保存和迁移只需要这一个镜像：
 
 ```bash
-docker save -o vllm-sm75-v0.1.7-ultra-beta.tar vllm-sm75:v0.1.7-ultra-beta
+docker save -o vllm-sm75-v0.1.7-ultra-beta2.tar vllm-sm75:v0.1.7-ultra-beta2
 # 在另一台兼容主机上导入：
-docker load -i vllm-sm75-v0.1.7-ultra-beta.tar
+docker load -i vllm-sm75-v0.1.7-ultra-beta2.tar
 ```
 
 镜像备份文件较大，需要单独预留磁盘。源码、模型和持久化配置分别保存。首次完全从官方基础环境构建仍可参考[完整构建文档](../docker/BUILD.md)；本节为复用已有正式Ultra的单镜像重建入口。
@@ -92,7 +92,7 @@ docker load -i vllm-sm75-v0.1.7-ultra-beta.tar
 主模型权重124,781,270,509 bytes，MTP权重4,140,094,152 bytes，合计约120 GiB，另需下载临时空间。已有完整模型先校验即可。
 
 ```bash
-export IMAGE=vllm-sm75:v0.1.7-ultra-beta
+export IMAGE=vllm-sm75:v0.1.7-ultra-beta2
 export MODEL_ROOT=/data/models
 export MODEL_NAME=Qwen3.8-Flash-Next-W4A16-FP8PLE
 export DATA_ROOT=/data/vllm-sm-next/flash-next-v017-20261003
@@ -120,7 +120,7 @@ docker run --rm --entrypoint hf \
 准备独立持久化目录和API Key。首次生成后保留此文件，重启会继续使用同一个Key。
 
 ```bash
-export IMAGE=vllm-sm75:v0.1.7-ultra-beta
+export IMAGE=vllm-sm75:v0.1.7-ultra-beta2
 export MODEL_ROOT=/data/models
 export DATA_ROOT=/data/vllm-sm-next/flash-next-v017-20261003
 export NVAPI_LIB=/usr/lib/x86_64-linux-gnu/libnvidia-api.so.1
@@ -215,7 +215,7 @@ docker exec flash-next-tp8 node /opt/sm75-workbench/console/auth-cli.mjs show
 
 该模板和Ultra中“Flash Next · TP8 · QSA · FP8 KV · MTP3 · 256K”使用同一份JSON。后接明确CLI参数会覆盖模板同名项。面板操作为：登记`/models/...`主模型 → 选择该模板 → 核对MTP草稿路径 → 保存并启动。完整参数命令已启动模型时，无需再启动另一个配置。
 
-只要推理API时，仍使用`vllm-sm75:v0.1.7-ultra-beta`，在镜像名称前增加`-e SM75_EDITION=standard`；保留相同模型参数、内核环境、API Key、GPU、缓存、P-State和NVAPI设置，去掉1615端口及`/dsh/home`、`/dsh/workspace`挂载。该模式直接启动vLLM，使用同一份推理代码和模板，无需第二个基础版镜像。
+只要推理API时，仍使用`vllm-sm75:v0.1.7-ultra-beta2`，在镜像名称前增加`-e SM75_EDITION=standard`；保留相同模型参数、内核环境、API Key、GPU、缓存、P-State和NVAPI设置，去掉1615端口及`/dsh/home`、`/dsh/workspace`挂载。该模式直接启动vLLM，使用同一份推理代码和模板，无需第二个基础版镜像。
 
 ## 5. 参数说明与权重分布
 

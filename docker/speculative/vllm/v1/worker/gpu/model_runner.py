@@ -204,6 +204,8 @@ class GPUModelRunner(LoRAModelRunnerMixin):
         self.parallel_config = vllm_config.parallel_config
         self.scheduler_config = vllm_config.scheduler_config
         self.speculative_config = vllm_config.speculative_config
+        from sm75_dspark_compat import validate_dspark_config
+        validate_dspark_config(vllm_config)
         self._draft_workspace_lane = int(
             self.speculative_config is not None and self.speculative_config.use_dspark()
         )
@@ -432,7 +434,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
                 if (
                     self.model_config.quantization == "fp8"
                     and self.speculative_config is not None
-                    and self.speculative_config.method == "dflash"
+                    and self.speculative_config.method in ("dflash", "dspark")
                     and torch.cuda.get_device_capability(self.device) == (7, 5)
                 ):
                     reserved_before = torch.cuda.memory_reserved(self.device)

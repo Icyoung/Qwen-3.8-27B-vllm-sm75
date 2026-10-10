@@ -33,6 +33,10 @@ test('API key reveal requires authenticated same-origin POST and never appears i
   let response=await fetch(endpoint+'/reveal',{method:'POST',headers,body:'{}'});assert.equal(response.status,200);assert.match(response.headers.get('cache-control'),/no-store/);assert.equal((await response.json()).key,engineKey);
   response=await fetch(endpoint,{method:'POST',headers,body:JSON.stringify({key:'synthetic-replacement-key'})});assert.equal(response.status,200);assert.equal((await response.json()).restartRequired,false);
   response=await fetch(endpoint+'/reveal',{method:'POST',headers,body:'{}'});assert.equal((await response.json()).key,'synthetic-replacement-key');
+  assert.equal((await fetch(base+'/console-api/benchlocal')).status,401);
+  let bench=await fetch(base+'/console-api/benchlocal',{headers});assert.equal(bench.status,200);bench=await bench.json();assert.equal(bench.packs.length,9);assert(!JSON.stringify(bench).includes(engineKey));
+  const blocked=await fetch(base+'/console-api/benchlocal',{method:'POST',headers:{...headers,Origin:'http://evil.invalid'},body:JSON.stringify({enabled:false})});assert.equal(blocked.status,403);
+  assert.equal((await fetch(base+'/benchlocal-native-ui.js')).status,200);
   const asset=await fetch(base+'/api-access-ui.js');assert.equal(asset.status,200);assert.match(asset.headers.get('content-type'),/javascript/);
  } finally {if(child.exitCode===null){const ended=once(child,'exit');child.kill();await ended;}assert.equal(path.dirname(root),os.tmpdir());fs.rmSync(root,{recursive:true,force:true});}
 });

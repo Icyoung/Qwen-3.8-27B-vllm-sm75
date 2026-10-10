@@ -11,9 +11,9 @@ fi
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 VERSION="$(tr -d ' \r\n' < "$ROOT/docker/VERSION")"
 [[ -n "$VERSION" ]] || { echo 'docker/VERSION is empty' >&2; exit 2; }
-ULTRA_VERSION="${VERSION%-beta}-ultra-beta"
-[[ "$VERSION" == *-beta ]] || ULTRA_VERSION="$VERSION-ultra"
-EDITION="${EDITION:-standard}"
+ULTRA_VERSION="${VERSION/-beta/-ultra-beta}"
+[[ "$VERSION" == *-beta* ]] || ULTRA_VERSION="$VERSION-ultra"
+EDITION="${EDITION:-ultra}"
 BUILD_MODE="${BUILD_MODE:-full}"
 case "$EDITION:$BUILD_MODE" in standard:full|standard:fast|ultra:full|ultra:ui) ;;
     *) echo 'Use EDITION=standard|ultra; BUILD_MODE=full, standard fast, or ultra ui' >&2; exit 2;; esac
@@ -34,12 +34,12 @@ if [[ "$EDITION" == ultra ]]; then
             --build-arg INSTALL_LMCACHE="${INSTALL_LMCACHE:-0}" \
             --tag "${IMAGE:-vllm-sm75:v${ULTRA_VERSION}-ui}" "$ROOT/ultra"
     fi
-    VLLM_IMAGE="${VLLM_IMAGE:-vllm-sm75:v${VERSION}}"
-    docker image inspect "$VLLM_IMAGE" >/dev/null
-    exec docker build --file "$ROOT/ultra/Dockerfile" \
-        --build-arg VLLM_IMAGE="$VLLM_IMAGE" --build-arg SOURCE_REVISION="$SOURCE_REVISION" --build-arg RELEASE_VERSION="$VERSION" \
+    exec docker build --file "$ROOT/docker/Dockerfile.ultra-full" --target final \
+        --build-arg BASE_IMAGE="$BASE_IMAGE" --build-arg MAX_JOBS="${MAX_JOBS:-1}" \
+        --build-arg SOURCE_REVISION="$SOURCE_REVISION" --build-arg RELEASE_VERSION="$ULTRA_VERSION" \
+        --build-arg VLLM_SM75_RELEASE="vllm-sm75-v${VERSION}" \
         --build-arg INSTALL_LMCACHE="${INSTALL_LMCACHE:-0}" \
-        --tag "${IMAGE:-vllm-sm75:v${ULTRA_VERSION}}" "$ROOT/ultra"
+        --tag "${IMAGE:-vllm-sm75:v${ULTRA_VERSION}}" "$ROOT"
 fi
 file=Dockerfile
 default_image="vllm-sm75:v${VERSION}"

@@ -1,0 +1,334 @@
+[
+  {
+    "id": "toolcall-15",
+    "tag": "v1.0.1",
+    "sha256": "96dbb0223e005a885fe15661474aaf74e5ee09c947170b1fccbcb4d47e5a55dc",
+    "bytes": 52867,
+    "entry_exists": true,
+    "manifest": {
+      "schemaVersion": 1,
+      "protocolVersion": 1,
+      "id": "toolcall-15",
+      "name": "ToolCall-15",
+      "author": "stevibe",
+      "version": "1.0.1",
+      "description": "Tool-use benchmark with 15 fixed scenarios and tool-call loop scoring.",
+      "entry": "./dist/benchlocal/index.js",
+      "samplingDefaults": {
+        "temperature": 0
+      },
+      "theme": {
+        "accent": "#c96b4a"
+      },
+      "capabilities": {
+        "tools": true,
+        "multiTurn": false,
+        "streamingProgress": true,
+        "verification": false
+      }
+    }
+  },
+  {
+    "id": "bugfind-15",
+    "tag": "v1.0.1",
+    "sha256": "8a008c42150fb66a5b60854d807528dd611738924c0643fc43f2e753b9d911a1",
+    "bytes": 80136,
+    "entry_exists": true,
+    "manifest": {
+      "schemaVersion": 1,
+      "protocolVersion": 1,
+      "id": "bugfind-15",
+      "name": "BugFind-15",
+      "author": "stevibe",
+      "version": "1.0.1",
+      "description": "Execution-backed debugging benchmark with verifier-backed scoring across 15 fixed scenarios.",
+      "entry": "./dist/benchlocal/index.js",
+      "samplingDefaults": {
+        "temperature": 0
+      },
+      "theme": {
+        "accent": "#1f5f78"
+      },
+      "capabilities": {
+        "tools": false,
+        "multiTurn": true,
+        "streamingProgress": true,
+        "verification": true
+      },
+      "verifiers": [
+        {
+          "id": "verifier",
+          "transport": "http",
+          "required": true,
+          "defaultMode": "docker",
+          "docker": {
+            "buildContext": "./verification",
+            "listenPort": 4010,
+            "healthcheckPath": "/health"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "dataextract-15",
+    "tag": "v1.0.0",
+    "sha256": "c0c473cbc2782f2e3ce09d845b01f11adf75a73c40b82cb8ee59ec459c355077",
+    "bytes": 65821,
+    "entry_exists": true,
+    "manifest": {
+      "schemaVersion": 1,
+      "protocolVersion": 1,
+      "id": "dataextract-15",
+      "name": "DataExtract-15",
+      "author": "stevibe",
+      "version": "1.0.0",
+      "description": "Deterministic LLM data extraction benchmark with 15 fixed scenarios.",
+      "entry": "./dist/benchlocal/index.js",
+      "samplingDefaults": {
+        "temperature": 0
+      },
+      "theme": {
+        "accent": "#0891b2"
+      },
+      "capabilities": {
+        "tools": false,
+        "multiTurn": false,
+        "streamingProgress": true,
+        "verification": false
+      }
+    }
+  },
+  {
+    "id": "instructfollow-15",
+    "tag": "v1.0.0",
+    "sha256": "24e75bd08b56755f826ed03c59c6fe981a74111fdec7bcb81e155c87b8363442",
+    "bytes": 44958,
+    "entry_exists": true,
+    "manifest": {
+      "schemaVersion": 1,
+      "protocolVersion": 1,
+      "id": "instructfollow-15",
+      "name": "InstructFollow-15",
+      "author": "stevibe",
+      "version": "1.0.0",
+      "description": "Constraint-heavy instruction-following benchmark with 15 fixed scenarios.",
+      "entry": "./dist/benchlocal/index.js",
+      "samplingDefaults": {
+        "temperature": 0
+      },
+      "theme": {
+        "accent": "#b45309"
+      },
+      "capabilities": {
+        "tools": false,
+        "multiTurn": false,
+        "streamingProgress": true,
+        "verification": false
+      }
+    }
+  },
+  {
+    "id": "promptauthority-15",
+    "tag": "v1.0.0",
+    "sha256": "d6ec8b11521a68d58577a6daf3e8f1806f0e3379d51470f97b11414115336869",
+    "bytes": 58180,
+    "entry_exists": true,
+    "manifest": {
+      "schemaVersion": 1,
+      "protocolVersion": 1,
+      "id": "promptauthority-15",
+      "name": "PromptAuthority-15",
+      "author": "stevibe",
+      "version": "1.0.0",
+      "description": "Deterministic prompt-authority conflict benchmark with binary canary grading and an HVC safety gate.",
+      "entry": "./dist/benchlocal/index.js",
+      "samplingDefaults": {
+        "temperature": 0
+      },
+      "theme": {
+        "accent": "#596b42"
+      },
+      "capabilities": {
+        "tools": true,
+        "multiTurn": true,
+        "streamingProgress": true,
+        "verification": false
+      }
+    }
+  },
+  {
+    "id": "reasonmath-15",
+    "tag": "v1.0.0",
+    "sha256": "d83d95d721abf7ffcc5659010fb0db2d0c827b505df956d39de3c96bca4eaf84",
+    "bytes": 42834,
+    "entry_exists": true,
+    "manifest": {
+      "schemaVersion": 1,
+      "protocolVersion": 1,
+      "id": "reasonmath-15",
+      "name": "ReasonMath-15",
+      "author": "stevibe",
+      "version": "1.0.0",
+      "description": "Practical reasoning and math benchmark with 15 fixed scenarios.",
+      "entry": "./dist/benchlocal/index.js",
+      "samplingDefaults": {
+        "temperature": 0
+      },
+      "theme": {
+        "accent": "#0f766e"
+      },
+      "capabilities": {
+        "tools": false,
+        "multiTurn": false,
+        "streamingProgress": true,
+        "verification": false
+      }
+    }
+  },
+  {
+    "id": "structoutput-15",
+    "tag": "v1.0.0",
+    "sha256": "e24fbebd9320c8c13e0702e1c893d951d6ed6d8f0001138c19cdf33c8bad22ce",
+    "bytes": 51235,
+    "entry_exists": true,
+    "manifest": {
+      "schemaVersion": 1,
+      "protocolVersion": 1,
+      "id": "structoutput-15",
+      "name": "StructOutput-15",
+      "author": "stevibe",
+      "version": "1.0.0",
+      "description": "Structured output benchmark with validator-backed scoring across 15 fixed scenarios.",
+      "entry": "./dist/benchlocal/index.js",
+      "samplingDefaults": {
+        "temperature": 0
+      },
+      "theme": {
+        "accent": "#3f6c8f"
+      },
+      "capabilities": {
+        "tools": false,
+        "multiTurn": false,
+        "streamingProgress": true,
+        "verification": true
+      },
+      "verifiers": [
+        {
+          "id": "verifier",
+          "transport": "http",
+          "required": true,
+          "defaultMode": "docker",
+          "docker": {
+            "buildContext": "./verification",
+            "listenPort": 4010,
+            "healthcheckPath": "/health"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "hermesagent-20",
+    "tag": "v1.0.0",
+    "sha256": "843b21c11b9a83a3274f91235820cc8f3744ea774b9f268a22cc35134b298442",
+    "bytes": 59765,
+    "entry_exists": true,
+    "manifest": {
+      "schemaVersion": 1,
+      "protocolVersion": 1,
+      "id": "hermesagent-20",
+      "name": "HermesAgent-20",
+      "author": "stevibe",
+      "version": "1.0.0",
+      "description": "Executable Hermes agent benchmark with deterministic artifact, trace, memory, browser, cron, and verifier-backed evaluation across 20 scenarios.",
+      "entry": "./dist/benchlocal/index.js",
+      "requirements": {
+        "benchlocal": {
+          "minVersion": "0.2.0"
+        },
+        "hostFeatures": [
+          "inferenceEndpoints",
+          "dockerInferenceEndpoints"
+        ]
+      },
+      "samplingDefaults": {
+        "temperature": 0
+      },
+      "theme": {
+        "accent": "#7b5cff"
+      },
+      "capabilities": {
+        "tools": true,
+        "multiTurn": true,
+        "streamingProgress": true,
+        "verification": true
+      },
+      "verifiers": [
+        {
+          "id": "verifier",
+          "transport": "http",
+          "required": true,
+          "defaultMode": "docker",
+          "docker": {
+            "buildContext": "./verification",
+            "listenPort": 4010,
+            "healthcheckPath": "/health"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "cli-40",
+    "tag": "v1.0.2",
+    "sha256": "f34f5467f4aa196e9acf3475850a75e49c7bcac4f945c1096ce339a5267b5b4a",
+    "bytes": 98557,
+    "entry_exists": true,
+    "manifest": {
+      "schemaVersion": 1,
+      "protocolVersion": 1,
+      "id": "cli-40",
+      "name": "CLI-40",
+      "author": "stevibe",
+      "version": "1.0.2",
+      "description": "Executable Linux CLI benchmark with deterministic verifier-backed evaluation across 40 one-shot and multi-round scenarios.",
+      "entry": "./dist/benchlocal/index.js",
+      "requirements": {
+        "benchlocal": {
+          "minVersion": "0.2.0"
+        },
+        "hostFeatures": [
+          "inferenceEndpoints",
+          "dockerInferenceEndpoints"
+        ]
+      },
+      "samplingDefaults": {
+        "temperature": 0,
+        "request_timeout_seconds": 300
+      },
+      "theme": {
+        "accent": "#198754"
+      },
+      "capabilities": {
+        "tools": true,
+        "multiTurn": true,
+        "streamingProgress": true,
+        "verification": true
+      },
+      "verifiers": [
+        {
+          "id": "verifier",
+          "transport": "http",
+          "required": true,
+          "defaultMode": "docker",
+          "docker": {
+            "buildContext": "./verification",
+            "listenPort": 4040,
+            "healthcheckPath": "/health"
+          }
+        }
+      ]
+    }
+  }
+]

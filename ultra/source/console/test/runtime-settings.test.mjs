@@ -61,7 +61,7 @@ test('NCCL SYS is only a fallback and profile/container empty explicit values su
 });
 
 test('Docker allowlist covers every importable setting and image defaults alone do not import',()=>{
-  const text=fs.readFileSync(new URL('../../../../docker/helpers/runtime-env.list',import.meta.url),'utf8');
+  const text=fs.readFileSync(process.env.SM75_RUNTIME_ENV_LIST || (process.env.SM75_RUNTIME_HELPER_ROOT ? process.env.SM75_RUNTIME_HELPER_ROOT+'/runtime-env.list' : new URL('../../../../docker/helpers/runtime-env.list',import.meta.url)),'utf8');
   for(const key of [...Object.keys(runtimeArgumentEnvironment),...Object.keys(runtimeLMCacheEnvironment),...Object.keys(runtimeBooleanEnvironment),...runtimeKernelEnvironment.filter(x=>x!=='NCCL_P2P_LEVEL')]) assert.ok(text.split(/\r?\n/).includes(key),key);
   assert.equal(hasRuntimeOverrides({NCCL_P2P_LEVEL:'SYS',VLLM_FIREFLY:'1'}),false);
   assert.equal(hasRuntimeOverrides({CPU_KV_GIB:'0'}),true);

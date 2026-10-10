@@ -1,0 +1,341 @@
+{
+  "schema": 1,
+  "adapter": "Ultra native bindings; no BenchLocal host/sdk/core/CLI runtime",
+  "packs": [
+    "toolcall-15",
+    "dataextract-15",
+    "instructfollow-15",
+    "promptauthority-15",
+    "reasonmath-15",
+    "structoutput-15",
+    "bugfind-15",
+    "cli-40",
+    "hermesagent-20"
+  ],
+  "files": [
+    {
+      "path": "packs/toolcall-15/benchlocal.pack.json",
+      "sha256": "74554d4b482484c01a8646bccdbbc59e3eaefc600d67df88ad52cbc90ecd7309"
+    },
+    {
+      "path": "packs/toolcall-15/dist/benchlocal/index.js",
+      "sha256": "990ab284a02875f9cd1e7fb87116be244f92fb83dcc5ab8d1007bcb2e778fcec"
+    },
+    {
+      "path": "packs/toolcall-15/dist/lib/benchmark.js",
+      "sha256": "fe8e9a426e11b06c25af269e72dd9a959a92a872d422ef736513074a23560230"
+    },
+    {
+      "path": "packs/toolcall-15/dist/lib/llm-client.js",
+      "sha256": "be9b53d6ac44bba75221fd5fb5fea27faabc4fe24a03d7646a0a5a11282e0657"
+    },
+    {
+      "path": "packs/toolcall-15/dist/lib/models.js",
+      "sha256": "365937e5d87a017a64e1dcc852756bea4f933ace0cb243de635a57891fdc5432"
+    },
+    {
+      "path": "packs/toolcall-15/dist/lib/orchestrator.js",
+      "sha256": "dae2fbae72e2e0c908dae867f52471713b7424bcbdc992a7b7afab068348d423"
+    },
+    {
+      "path": "packs/toolcall-15/LICENSE",
+      "sha256": "55cec31f59519eb3fca7c4b8618b494ff1b55c93b8ebd6425bf1c12e6e20fd30"
+    },
+    {
+      "path": "packs/toolcall-15/package.json",
+      "sha256": "571531e73f77ab3aa081db50b4fdec6cbb77e0518c0e9268e7ff2543e26f153e"
+    },
+    {
+      "path": "packs/dataextract-15/benchlocal.pack.json",
+      "sha256": "57915df1fefead693bee31351732b81d508d9a8faacdcb78f24e8833b6559bcc"
+    },
+    {
+      "path": "packs/dataextract-15/dist/benchlocal/index.js",
+      "sha256": "1d542ee483cbe0f7877a617d5cbe7e2188058f47890cba04306b1275fed07c71"
+    },
+    {
+      "path": "packs/dataextract-15/dist/lib/benchmark.js",
+      "sha256": "d28187f21bd565ceec1813d86c1cc688c458986efd0cae5aae033a8edb7e9f72"
+    },
+    {
+      "path": "packs/dataextract-15/dist/lib/llm-client.js",
+      "sha256": "5438c88c53cc0b2039bf4e6672eca4a1181b1535c328ecc44e9f889baeca39a1"
+    },
+    {
+      "path": "packs/dataextract-15/dist/lib/models.js",
+      "sha256": "365937e5d87a017a64e1dcc852756bea4f933ace0cb243de635a57891fdc5432"
+    },
+    {
+      "path": "packs/dataextract-15/dist/lib/orchestrator.js",
+      "sha256": "353509183a6622ca47a222e3ed137fb6a0e72c5087a25b690266211b2704f132"
+    },
+    {
+      "path": "packs/dataextract-15/LICENSE",
+      "sha256": "55cec31f59519eb3fca7c4b8618b494ff1b55c93b8ebd6425bf1c12e6e20fd30"
+    },
+    {
+      "path": "packs/dataextract-15/package.json",
+      "sha256": "571531e73f77ab3aa081db50b4fdec6cbb77e0518c0e9268e7ff2543e26f153e"
+    },
+    {
+      "path": "packs/instructfollow-15/benchlocal.pack.json",
+      "sha256": "ba4fdc551f71725d28ad3654dcab278690ca55d87701ec2b64d7174b30c1f584"
+    },
+    {
+      "path": "packs/instructfollow-15/dist/benchlocal/index.js",
+      "sha256": "1d542ee483cbe0f7877a617d5cbe7e2188058f47890cba04306b1275fed07c71"
+    },
+    {
+      "path": "packs/instructfollow-15/dist/lib/benchmark.js",
+      "sha256": "636e2ed3819cbdf10240a1df86dfc592eabf291f8eb8fb8d174a504d40cce9ea"
+    },
+    {
+      "path": "packs/instructfollow-15/dist/lib/llm-client.js",
+      "sha256": "5438c88c53cc0b2039bf4e6672eca4a1181b1535c328ecc44e9f889baeca39a1"
+    },
+    {
+      "path": "packs/instructfollow-15/dist/lib/models.js",
+      "sha256": "365937e5d87a017a64e1dcc852756bea4f933ace0cb243de635a57891fdc5432"
+    },
+    {
+      "path": "packs/instructfollow-15/dist/lib/orchestrator.js",
+      "sha256": "353509183a6622ca47a222e3ed137fb6a0e72c5087a25b690266211b2704f132"
+    },
+    {
+      "path": "packs/instructfollow-15/LICENSE",
+      "sha256": "55cec31f59519eb3fca7c4b8618b494ff1b55c93b8ebd6425bf1c12e6e20fd30"
+    },
+    {
+      "path": "packs/instructfollow-15/package.json",
+      "sha256": "571531e73f77ab3aa081db50b4fdec6cbb77e0518c0e9268e7ff2543e26f153e"
+    },
+    {
+      "path": "packs/promptauthority-15/benchlocal.pack.json",
+      "sha256": "a8735c5b0be72e766a09ecb7247a5b9d45f6b494d01287b52a5a01ba6ef7970c"
+    },
+    {
+      "path": "packs/promptauthority-15/dist/benchlocal/index.js",
+      "sha256": "0aa0bf1df29776ba49d362e6d87008cf0b8534f690c4e03fc13eb35e82fcc29f"
+    },
+    {
+      "path": "packs/promptauthority-15/dist/lib/benchmark.js",
+      "sha256": "f43cf03268219c60eb3db2a63a7427033eb9633451a7e9f8b10eee587aad4da8"
+    },
+    {
+      "path": "packs/promptauthority-15/dist/lib/llm-client.js",
+      "sha256": "89c4e11a2fbeaf7aec8d767caf8b3c9804962f5f34a7bcaca6de9667a6a2f527"
+    },
+    {
+      "path": "packs/promptauthority-15/dist/lib/models.js",
+      "sha256": "4cc0e0489ada302b35c68b092d64b40a8ba66800cbae73d4347b3465de396dd7"
+    },
+    {
+      "path": "packs/promptauthority-15/dist/lib/orchestrator.js",
+      "sha256": "fced3e678592a4b4debe211004be4b21be04943f33226fb76e630b4ff0e687d1"
+    },
+    {
+      "path": "packs/promptauthority-15/LICENSE",
+      "sha256": "55cec31f59519eb3fca7c4b8618b494ff1b55c93b8ebd6425bf1c12e6e20fd30"
+    },
+    {
+      "path": "packs/promptauthority-15/package.json",
+      "sha256": "571531e73f77ab3aa081db50b4fdec6cbb77e0518c0e9268e7ff2543e26f153e"
+    },
+    {
+      "path": "packs/reasonmath-15/benchlocal.pack.json",
+      "sha256": "8efd5d03d3a6d55a7d37e1dd869a3a0cdd021ff93a9c990895202962e24aae3d"
+    },
+    {
+      "path": "packs/reasonmath-15/dist/benchlocal/index.js",
+      "sha256": "1d542ee483cbe0f7877a617d5cbe7e2188058f47890cba04306b1275fed07c71"
+    },
+    {
+      "path": "packs/reasonmath-15/dist/lib/benchmark.js",
+      "sha256": "2d8c73977734f782d31fa993aae6f2af40d9cc90ba0f468f28d9e54bea63ed93"
+    },
+    {
+      "path": "packs/reasonmath-15/dist/lib/llm-client.js",
+      "sha256": "5438c88c53cc0b2039bf4e6672eca4a1181b1535c328ecc44e9f889baeca39a1"
+    },
+    {
+      "path": "packs/reasonmath-15/dist/lib/models.js",
+      "sha256": "365937e5d87a017a64e1dcc852756bea4f933ace0cb243de635a57891fdc5432"
+    },
+    {
+      "path": "packs/reasonmath-15/dist/lib/orchestrator.js",
+      "sha256": "353509183a6622ca47a222e3ed137fb6a0e72c5087a25b690266211b2704f132"
+    },
+    {
+      "path": "packs/reasonmath-15/LICENSE",
+      "sha256": "55cec31f59519eb3fca7c4b8618b494ff1b55c93b8ebd6425bf1c12e6e20fd30"
+    },
+    {
+      "path": "packs/reasonmath-15/package.json",
+      "sha256": "571531e73f77ab3aa081db50b4fdec6cbb77e0518c0e9268e7ff2543e26f153e"
+    },
+    {
+      "path": "packs/structoutput-15/benchlocal.pack.json",
+      "sha256": "2bc012c17be067f52b7d7bd35f5a1bdfdf4f2843489da8a9b8ba734dcf7bfb2d"
+    },
+    {
+      "path": "packs/structoutput-15/dist/benchlocal/index.js",
+      "sha256": "2b33d4d42b77b322a8a0751a8953c843b979db1003870770a9a4c14f576ae3dd"
+    },
+    {
+      "path": "packs/structoutput-15/dist/lib/benchmark.js",
+      "sha256": "8a0011acb1789e6f6e4dc719e998cd228a315b426c16022f1c53acc46410630e"
+    },
+    {
+      "path": "packs/structoutput-15/dist/lib/llm-client.js",
+      "sha256": "92bc60fd6b295da555570872169651e284b9c8f26cdb28d74a57847216be3a1b"
+    },
+    {
+      "path": "packs/structoutput-15/dist/lib/models.js",
+      "sha256": "365937e5d87a017a64e1dcc852756bea4f933ace0cb243de635a57891fdc5432"
+    },
+    {
+      "path": "packs/structoutput-15/dist/lib/orchestrator.js",
+      "sha256": "e4b36dfb4af89efaaead3cff6b7d5ceff200cb26f433d76863596bd4662accfb"
+    },
+    {
+      "path": "packs/structoutput-15/dist/lib/sandbox-client.js",
+      "sha256": "abbc25489d42bf3f5072479832483b5a65d66b928dd93c243a538c7fd7d71936"
+    },
+    {
+      "path": "packs/structoutput-15/LICENSE",
+      "sha256": "55cec31f59519eb3fca7c4b8618b494ff1b55c93b8ebd6425bf1c12e6e20fd30"
+    },
+    {
+      "path": "packs/structoutput-15/package.json",
+      "sha256": "571531e73f77ab3aa081db50b4fdec6cbb77e0518c0e9268e7ff2543e26f153e"
+    },
+    {
+      "path": "packs/structoutput-15/verification/core.mjs",
+      "sha256": "77d315d42e88fe8a46d6b93cc124b7c219cb536a44e5cd942ae204bec95b5e43"
+    },
+    {
+      "path": "packs/structoutput-15/verification/Dockerfile",
+      "sha256": "74315fd0cc82d548228d1185dfd604e5ff9d1479d7a24342fb0bc61bc6483be5"
+    },
+    {
+      "path": "packs/structoutput-15/verification/server.mjs",
+      "sha256": "364a99c2b6862c2a6b30d7eccbd2f121846e082dbd085abdd411785feee1e667"
+    },
+    {
+      "path": "packs/bugfind-15/benchlocal.pack.json",
+      "sha256": "4a1b2bc341ad11a780ef0938c29216acf27cecbf80ae5fbc1c777063dbcc1cf5"
+    },
+    {
+      "path": "packs/bugfind-15/dist/benchlocal/index.js",
+      "sha256": "980fd16acc3d5249f5cf34f61f4fae134842d026ebce96e92200ffb1ed2802fa"
+    },
+    {
+      "path": "packs/bugfind-15/dist/lib/benchmark.js",
+      "sha256": "67714c0d47418022fb9f07ddb1670bba02bcee75a5659035e24cabd9d7d6552a"
+    },
+    {
+      "path": "packs/bugfind-15/dist/lib/llm-client.js",
+      "sha256": "92bc60fd6b295da555570872169651e284b9c8f26cdb28d74a57847216be3a1b"
+    },
+    {
+      "path": "packs/bugfind-15/dist/lib/models.js",
+      "sha256": "365937e5d87a017a64e1dcc852756bea4f933ace0cb243de635a57891fdc5432"
+    },
+    {
+      "path": "packs/bugfind-15/dist/lib/orchestrator.js",
+      "sha256": "bdbb01d643a212122cc9c704e3a5a36405154ceb4913a3a8165350cead7be6be"
+    },
+    {
+      "path": "packs/bugfind-15/dist/lib/sandbox-client.js",
+      "sha256": "ad45a5f8e9d9f35b53f2364c848d40556c5faee559f4d1199200755fa8dd8fcc"
+    },
+    {
+      "path": "packs/bugfind-15/LICENSE",
+      "sha256": "55cec31f59519eb3fca7c4b8618b494ff1b55c93b8ebd6425bf1c12e6e20fd30"
+    },
+    {
+      "path": "packs/bugfind-15/package.json",
+      "sha256": "571531e73f77ab3aa081db50b4fdec6cbb77e0518c0e9268e7ff2543e26f153e"
+    },
+    {
+      "path": "packs/cli-40/benchlocal.pack.json",
+      "sha256": "82913a1ef47b63cd8d533e79df7fd1d6ff9997c5f1ce121d61a4999a332b818f"
+    },
+    {
+      "path": "packs/cli-40/dist/benchlocal/index.js",
+      "sha256": "b27597f0e6ab7b2d90f703b93de4ec3918ff35cf65d153b5717aca18430b4b05"
+    },
+    {
+      "path": "packs/cli-40/dist/lib/benchmark.js",
+      "sha256": "3197a195c9b03450f92c206686a186f7ea595715a56b9b33dea0dcc40fe8b72d"
+    },
+    {
+      "path": "packs/cli-40/dist/lib/orchestrator.js",
+      "sha256": "9a878dda42dee2a1077bfeb982403725c125bc6590521356430df4d429898097"
+    },
+    {
+      "path": "packs/cli-40/dist/verification/bash-session.mjs",
+      "sha256": "688a1b768ba0f16147901b401be64a52a9a29f115eaa67bc67478d38df89109d"
+    },
+    {
+      "path": "packs/cli-40/dist/verification/core.mjs",
+      "sha256": "21f197db92daa0a05ffd139faa96861a2be3b51f2051ee2808b8411c6d16f04f"
+    },
+    {
+      "path": "packs/cli-40/dist/verification/Dockerfile",
+      "sha256": "a2d68dc2037b7de2d7b24b4654eac0f90ece92cc08732a7ef682bdc3490e6c2f"
+    },
+    {
+      "path": "packs/cli-40/dist/verification/manifest.mjs",
+      "sha256": "809f53c19f654f35210898c1c80dfb936444899ebe36e88599d61594a6693ca9"
+    },
+    {
+      "path": "packs/cli-40/dist/verification/openai.mjs",
+      "sha256": "ceb9f1481c3292f145835ba7b692f26d537dce84acb7c2d034d14aff99c386f3"
+    },
+    {
+      "path": "packs/cli-40/dist/verification/scenario-data.json",
+      "sha256": "1c28e553cfe9931fe99fbb1f014ecec645c970cb8e7073ad606c0997619fb6c6"
+    },
+    {
+      "path": "packs/cli-40/dist/verification/server.mjs",
+      "sha256": "2399c084107177a9f2db46466c5875f4148749e832d39459ed2a551517ee6a94"
+    },
+    {
+      "path": "packs/cli-40/LICENSE",
+      "sha256": "55cec31f59519eb3fca7c4b8618b494ff1b55c93b8ebd6425bf1c12e6e20fd30"
+    },
+    {
+      "path": "packs/cli-40/package.json",
+      "sha256": "571531e73f77ab3aa081db50b4fdec6cbb77e0518c0e9268e7ff2543e26f153e"
+    },
+    {
+      "path": "packs/hermesagent-20/benchlocal.pack.json",
+      "sha256": "5fc54c31e845ad726d950bce79a90c88d3db1ab8d3d2cb1321b98faee4bb79dc"
+    },
+    {
+      "path": "packs/hermesagent-20/dist/benchlocal/index.js",
+      "sha256": "b27597f0e6ab7b2d90f703b93de4ec3918ff35cf65d153b5717aca18430b4b05"
+    },
+    {
+      "path": "packs/hermesagent-20/dist/lib/benchmark.js",
+      "sha256": "ec0114da7eae8b02e3193adb7d345620be928f6e7cf0d062f3e21171a04e53d0"
+    },
+    {
+      "path": "packs/hermesagent-20/dist/lib/hermes-runtime.js",
+      "sha256": "057cb36daf1092e9ae0024b1e96bd93952b4fd189b2d6e097addfe1c187e8ba3"
+    },
+    {
+      "path": "packs/hermesagent-20/dist/lib/orchestrator.js",
+      "sha256": "ad7b9c083f9ca4acde5743b954122cbeb3eb1ed469d53008c43a88e7ed61e9be"
+    },
+    {
+      "path": "packs/hermesagent-20/LICENSE",
+      "sha256": "55cec31f59519eb3fca7c4b8618b494ff1b55c93b8ebd6425bf1c12e6e20fd30"
+    },
+    {
+      "path": "packs/hermesagent-20/package.json",
+      "sha256": "571531e73f77ab3aa081db50b4fdec6cbb77e0518c0e9268e7ff2543e26f153e"
+    }
+  ]
+}

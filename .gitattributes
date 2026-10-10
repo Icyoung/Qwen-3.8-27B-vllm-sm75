@@ -25,3 +25,11 @@ docker/next/overlay/** -text whitespace=blank-at-eol,blank-at-eof,space-before-t
 docker/next/templates/*.jinja text eol=lf
 docker/helpers/runtime-env.list text eol=lf
 docs/models/*.sha256 text eol=lf
+
+# Preserve pinned upstream benchmark pack bytes and SHA256 identities.
+ultra/source/benchlocal-native/packs/** -text
+
+*.cjs text eol=lf
+*.lock text eol=lf
+**/LICENSE text eol=lf
+ultra/source/benchlocal-native/packs/** -text

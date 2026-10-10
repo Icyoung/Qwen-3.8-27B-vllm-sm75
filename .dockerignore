@@ -49,3 +49,6 @@ rust/target/
 /.pytest_cache
 /.ruff_cache
 /tmp
+
+!ultra/source/benchlocal-native/**
+!ultra/source/benchlocal-verifiers/**

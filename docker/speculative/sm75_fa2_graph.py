@@ -35,6 +35,9 @@ def captured_query_rows(num_spec_tokens,capture_sizes,max_capture_size):
 
 def capture_config(config):
     sd=config.speculative_config
+    if sd is not None and sd.method == "dspark":
+        from sm75_dspark_compat import graph_capture_plan
+        return graph_capture_plan(config)
     cc=config.compilation_config
     return captured_query_rows(sd.num_speculative_tokens if sd else 0,
         cc.cudagraph_capture_sizes,cc.max_cudagraph_capture_size)

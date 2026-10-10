@@ -1,0 +1,7 @@
+{
+  "name": "sm75-benchlocal-native",
+  "version": "0.1.7-beta2",
+  "private": true,
+  "type": "commonjs",
+  "dependencies": {}
+}

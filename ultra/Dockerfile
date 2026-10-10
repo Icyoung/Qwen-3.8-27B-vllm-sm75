@@ -8,14 +8,17 @@ RUN npm ci --omit=dev --no-audit --no-fund
 FROM ${VLLM_IMAGE}
 ENV NCCL_P2P_LEVEL=SYS
 ARG SOURCE_REVISION=source-archive
-ARG RELEASE_VERSION=0.1.7-beta
+ARG RELEASE_VERSION=0.1.7-beta2
 LABEL org.opencontainers.image.version="${RELEASE_VERSION}"
+LABEL org.opencontainers.image.source="https://github.com/fishensw/VLLM-SM75" io.sm75.source-commit="${SOURCE_REVISION}"
 LABEL org.opencontainers.image.title="VLLM-SM75 Ultra" org.opencontainers.image.revision="${SOURCE_REVISION}"
 COPY --from=harness /usr/local/bin/node /usr/local/bin/node
 COPY --from=harness /opt/harness/node_modules /opt/harness/node_modules
 RUN ln -sf /opt/harness/node_modules/pnpm/bin/pnpm.mjs /usr/local/bin/pnpm \
     && pnpm --version
 COPY source /opt/sm75-workbench
+RUN python3 /opt/sm75-workbench/benchlocal-verifiers/install-runtime.py
+LABEL io.sm75.benchlocal.unified="1"
 ARG INSTALL_LMCACHE=0
 RUN if [ "${INSTALL_LMCACHE}" = "1" ]; then python3 /opt/sm75-workbench/lmcache/install.py --install --build-no-gpu; fi
 COPY overlay/font-scale.py /opt/vllm-sm75/font-scale.py
@@ -27,6 +30,9 @@ RUN chmod +x /opt/vllm-sm75/pstate-supervisor.sh
 # Monitor APIs are inherited from the matching standard image.
 ENV SM75_CONSOLE_HOST=0.0.0.0 SM75_CONSOLE_PORT=1615 SM75_SINGLE_CONTAINER=1 NVIDIA_DRIVER_CAPABILITIES=compute,utility
 WORKDIR /opt/sm75-workbench
+ENV SM75_BENCHLOCAL_RUNTIME=/opt/sm75-workbench/benchlocal-native
 ENV SM75_EDITION=ultra
 ENTRYPOINT ["python3", "/opt/vllm-sm75/runtime-entrypoint.py"]
 CMD []
+
+LABEL io.sm75.console.sha256="" io.sm75.console.source-sha256="" io.sm75.ui-overlay-sha256=""

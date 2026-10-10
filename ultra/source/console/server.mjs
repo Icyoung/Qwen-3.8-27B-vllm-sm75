@@ -1,9 +1,13 @@
+import { BenchLocal } from './benchlocal-native.mjs';
+import {deleteRuntimeProfile,deletedBootProfile,persistProfiles} from './profile-delete.mjs';
+import {thinkingCapabilities,normalizeOptions,digest} from './benchlocal-contract.mjs';
+import {preflightCpuKV} from './cpu-kv-resources.mjs';
 import {inferenceProfiles} from './inference-profiles.mjs';
 import {applyRuntimeEnvironment, hasRuntimeOverrides} from './runtime-settings.mjs';
 import {waitForEngine} from './engine-ready.mjs';
-import {modelFormat, createModelDraft, preflightModel} from './model-launch.mjs';
+import {modelFormat, createModelDraft, preflightModel, profileModelRoles, catalogModelRole} from './model-launch.mjs';
 import {ManagedLMCache, preflightLMCache, lmcachePlan, lmcacheEnvironment, terminateLMCacheProcess} from './lmcache-runtime.mjs';
-import {modelContext, retargetContextModel} from './public/context-config.js';
+import {modelContext, retargetContextModel, argValue} from './public/context-config.js';
 import { harnessVersion } from "./apply-branding.mjs";
 import { harnessPath } from "./harness-config.mjs";
 import { Attachments } from "./attachments.mjs";
@@ -90,6 +94,7 @@ const syncEngineKeyFile = () => {
 };
 syncEngineKeyFile();
 const originalTests = new OriginalTests(root, store, engineKey);
+const benchLocal = new BenchLocal(root);
 const attachments = new Attachments(root);
 const profilesPath = path.join(root, "profiles.json");
 let profiles = fs.existsSync(profilesPath)
@@ -148,24 +153,19 @@ const json = (res, data, code = 200) => {
   });
   res.end(JSON.stringify(data));
 };
-async function body(req) {
-  let b = "";
+async function body(req, limit=1_000_000) {
+  const chunks=[];let bytes=0;
   for await (const c of req) {
-    b += c;
-    if (b.length > 1_000_000) throw Error("请求过大");
+    bytes+=c.length;chunks.push(c);
+    if (bytes > limit) throw Error("请求过大");
   }
-  return JSON.parse(b || "{}");
+  return JSON.parse(Buffer.concat(chunks).toString('utf8') || "{}");
 }
 const equal = equalSecret;
 function logged(req) {
   return !!auth.principal(req);
 }
-function save() {
-  fs.writeFileSync(profilesPath + ".tmp", JSON.stringify(profiles, null, 2), {
-    mode: 0o600,
-  });
-  fs.renameSync(profilesPath + ".tmp", profilesPath);
-}
+function save(next=profiles) {persistProfiles(profilesPath,next);}
 function profile(id) {
   const p = profiles.find((p) => p.id === id);
   if (!p) throw Error("配置不存在");
@@ -285,7 +285,7 @@ async function launchDownload(repo, provider, options = {}) {
     `${modelRoot}:/downloads`,
     "--entrypoint",
     "python3",
-    "vllm-sm75:v0.1.7-beta",
+    "vllm-sm75:v0.1.7-beta2",
     "-c",
     script,
     repo,
@@ -422,6 +422,7 @@ function weightGiB(dir) {
 }
 function modelCatalog() {
   const found = new Map();
+  const referencedRoles = profileModelRoles(profiles);
   const add = (dir, name, format, role = "main") => {
     try {
       const actual = fs.realpathSync(dir),
@@ -445,15 +446,14 @@ function modelCatalog() {
         modelType: cfg.model_type,
         context: modelContext(cfg),
         weightGiB: weightGiB(actual),
-        role: old?.role === "main" ? "main" : role,
+        role: catalogModelRole(actual, referencedRoles, old?.role, role),
       });
     } catch {}
   };
   for (const p of profiles) {
     add(p.args[0], null, p.format);
-    const i = p.args.indexOf("--speculative-config");
     try {
-      const spec = JSON.parse(p.args[i + 1]);
+      const spec = JSON.parse(argValue(p.args, "--speculative-config", "{}"));
       if (spec.model) add(spec.model, null, null, "draft");
     } catch {}
   }
@@ -465,6 +465,7 @@ function modelCatalog() {
   return [...found.values()];
 }
 async function start(p) {
+  if(benchLocal.busy)throw Error("请先停止BenchLocal测试");
   if (shuttingDown) throw Error("管理服务正在关闭");
   p = unifiedProfile(p);
   if (locks.has("model-switch") || locks.has(p.id) || locks.has("model-delete"))
@@ -479,6 +480,7 @@ async function start(p) {
     if (st.running) return st;
     // Check optional dependencies and disk before switchModel can stop the current engine.
     preflightModel(p, {cards:await gpu()});
+    if (standalone || p.backend === "native") preflightCpuKV(p, {capacityOnly:!!standalone?.engine});
     const cacheCheck = await preflightLMCache(p, {standalone: !!standalone,
       ownedPorts: standalone?.lmcache.child ? standalone.lmcache.ports : []});
     if (shuttingDown) throw Error("管理服务正在关闭");
@@ -591,6 +593,7 @@ async function start(p) {
   }
 }
 async function stop(p) {
+  if(benchLocal.busy)throw Error("请先停止BenchLocal测试");
   if (standalone) return standalone.stop(p);
   if (p.backend === "native") {
     if (locks.has("model-switch") || locks.has(p.id) || locks.has("model-delete"))
@@ -639,8 +642,33 @@ async function proxy(req, res, p, suffix, payload) {
     }
   res.end();
 }
+async function benchModelContext(requireReady=false) {
+  const engine=standalone?.engine;
+  const p=engine?.profile||profiles.find(x=>x.id===engine?.id)||profiles.find(x=>x.id===store.settings().defaultProfile)||profiles[0];
+  if(!p){if(requireReady)throw Error('请先启动模型');return {running:false,capabilities:{toggle:false,budget:false,reason:'请先启动模型'}};}
+  const engineState=await status(p);
+  const loading=!!engineState.running&&!!engineState.phase&&engineState.phase!=='ready';
+  const running=!!engineState.running&&!loading;
+  const capabilities=thinkingCapabilities(p);
+  const modelName=path.basename(p.args[0]);
+  if(!requireReady)return {running,loading,modelName,profileName:p.name,capabilities};
+  if(!running)throw Error(loading?'模型正在加载，请稍后再开始评测':'请先启动当前模型');
+  const response=await fetch(endpoint(p)+'/v1/models',{headers:{Authorization:'Bearer '+engineKey()},signal:AbortSignal.timeout(5000)});
+  if(!response.ok)throw Error('模型尚未就绪');
+  const data=await response.json(),model=data.data?.[0]?.id;
+  if(!model|| (standalone&&standalone.engine!==engine))throw Error('运行模型已变化，请重试');
+  let spec={},config={};
+  try{spec=JSON.parse(argValue(p.args,'--speculative-config')||'{}');}catch{}
+  try{config=JSON.parse(fs.readFileSync(path.join(p.args[0],'config.json'),'utf8'));}catch{}
+  const snapshot={engine:'vLLM 0.30.0 / SM75',kv:argValue(p.args,'--kv-cache-dtype'),context:argValue(p.args,'--max-model-len'),
+    tp:argValue(p.args,'--tensor-parallel-size'),quantization:argValue(p.args,'--quantization')||config.quantization_config?.quant_method||'auto',
+    speculation:{method:spec.method||'none',tokens:spec.num_speculative_tokens||0,draft:spec.model?path.basename(spec.model):null}};
+  return {url:endpoint(p),model,modelName,profileName:p.name,profile:p.id,capabilities,snapshot,
+    identity:digest({config,modelName,snapshot}),engineKey:engineKey(),isCurrent:()=>!standalone||standalone.engine===engine};
+}
 const server = http.createServer(async (req, res) => {
   try {
+    if(await benchLocal.proxy.handle(req,res))return;
     if (!auth.networkAllowed(req)) return json(res, { error: "当前地址不在允许网段内" }, 403);
     const u = new URL(req.url, "http://local");
     if (u.pathname.startsWith("/brand/")) {
@@ -751,6 +779,7 @@ const server = http.createServer(async (req, res) => {
       u.pathname === "/" ||
       u.pathname === "/app.js" ||
       u.pathname === "/api-access-ui.js" ||
+      u.pathname === "/benchlocal-native-ui.js" ||
       u.pathname === "/appearance-bootstrap.js" ||
       u.pathname === "/live-summary.js" ||
       u.pathname === "/context-config.js" ||
@@ -762,6 +791,7 @@ const server = http.createServer(async (req, res) => {
         "/": "index.html",
         "/app.js": "app.js",
         "/api-access-ui.js": "api-access-ui.js",
+        "/benchlocal-native-ui.js": "benchlocal-native-ui.js",
         "/appearance-bootstrap.js": "appearance-bootstrap.js",
         "/live-summary.js": "live-summary.js",
         "/context-config.js": "context-config.js",
@@ -796,7 +826,7 @@ const server = http.createServer(async (req, res) => {
         return res.end(data);
       } catch { return json(res,{error:"附件不存在"},404); }
     }
-    const b = req.method === "POST" ? await body(req) : {};
+    const b = req.method === "POST" ? await body(req,u.pathname==='/api/benchlocal/import'?25*1024*1024:1_000_000) : {};
     if (u.pathname === "/api/security") {
       if (req.method === "GET") return json(res, auth.securityInfo(req));
       if (req.method === "POST") {
@@ -828,6 +858,38 @@ const server = http.createServer(async (req, res) => {
       res.on("close", () => stream.destroy());
       stream.pipe(res);
       return;
+    }
+    if (u.pathname === "/api/benchlocal") {
+      let setting=store.get("extension","benchlocal")||{enabled:true,presets:[]};
+      if(req.method==="POST") {
+        if(b.enabled!==undefined) {
+          if(typeof b.enabled!=="boolean")throw Error("开关格式错误");
+          if(!b.enabled&&benchLocal.busy)throw Error("请先停止BenchLocal测试");
+          setting={...setting,enabled:b.enabled};
+        }
+        if(b.preset!==undefined) {
+          const name=String(b.preset.name||'').trim();if(!name||name.length>100)throw Error('请输入1–100字的参数方案名称');
+          const options=normalizeOptions({...b.preset.options,presetName:name},{toggle:true,budget:true});
+          const item={name,options:{...options.generation,thinking:options.thinking,effort:options.effort,presetName:name}};
+          const presets=(setting.presets||[]).filter(x=>x.name!==name);if(presets.length>=30)throw Error('参数方案最多保存30项');
+          setting={...setting,presets:[...presets,item]};
+        }
+        store.put("extension","benchlocal",setting);
+      } else if(req.method!=="GET")return json(res,{error:"不支持的方法"},405);
+      return json(res,{...benchLocal.catalog(),enabled:setting.enabled!==false,presets:setting.presets||[],currentModel:await benchModelContext(),
+        readiness:await benchLocal.readiness(),jobs:benchLocal.list(),activeId:benchLocal.active?.id||null});
+    }
+    if (u.pathname === "/api/benchlocal/run" && req.method === "POST") {
+      if((store.get("extension","benchlocal")||{enabled:true}).enabled!==true)throw Error("请先开启BenchLocal");
+      if(locks.has("model-switch")||[...jobs.values()].some(j=>j.kind==="benchmark"&&j.state==="running"))throw Error("其他操作或测试正在运行");
+      return json(res,await benchLocal.start(b,await benchModelContext(true)));
+    }
+    if (u.pathname === "/api/benchlocal/cancel" && req.method === "POST")return json(res,await benchLocal.cancel(b.id));
+    if (u.pathname === "/api/benchlocal/result" && req.method === "GET")return json(res,benchLocal.detail(u.searchParams.get("id")));
+    if (u.pathname === '/api/benchlocal/import' && req.method==='POST')return json(res,benchLocal.import(b.report));
+    if (u.pathname === '/api/benchlocal/export' && req.method==='GET') {
+      const id=u.searchParams.get('id'),format=u.searchParams.get('format')==='csv'?'csv':'json';
+      return json(res,{filename:'BenchLocal-'+id+'.'+format,content:benchLocal.export(id,{format,detailed:u.searchParams.get('detailed')==='1'})});
     }
     if (u.pathname === "/api/benchmarks/extension") {
       const type = u.searchParams.get("type") === "sql" ? "sql" : "speedtest",
@@ -1137,6 +1199,7 @@ const server = http.createServer(async (req, res) => {
     if (u.pathname === '/api/profiles/validate' && req.method === 'POST') {
       const p = validateProfile(unifiedProfile(b));
       preflightModel(p,{cards:await gpu()});
+      if (standalone || p.backend === "native") preflightCpuKV(p, {capacityOnly:!!standalone?.engine});
       await preflightLMCache(p,{standalone:!!standalone,ownedPorts:standalone?.lmcache.child ? standalone.lmcache.ports : []});
       return json(res,{ok:true});
     }
@@ -1169,12 +1232,15 @@ const server = http.createServer(async (req, res) => {
     if (u.pathname === "/api/profiles") {
       if (req.method === "POST") {
         const p = validateProfile(unifiedProfile(b));
-        const old = profiles.findIndex((x) => x.id === p.id);
-        if (old >= 0 && (await status(profiles[old])).running)
-          throw Error("先停止候选模型再修改配置");
-        if (old >= 0) profiles[old] = p;
-        else profiles.push(p);
-        save();
+        if(shuttingDown||locks.has('model-switch')||locks.has('model-delete')||locks.has(p.id))throw Error('配置操作进行中，请稍后重试');
+        locks.add(p.id);locks.add('model-switch');
+        try {
+          const old=profiles.findIndex(x=>x.id===p.id);
+          if(old>=0&&(await status(profiles[old])).running)throw Error('先停止候选模型再修改配置');
+          const next=[...profiles];if(old>=0)next[old]=p;else next.push(p);
+          save(next);profiles=next;
+          store.db.prepare('DELETE FROM records WHERE kind=? AND id=?').run('profile-deletion',p.id);
+        } finally {locks.delete(p.id);locks.delete('model-switch');}
       }
       return json(res, profiles);
     }
@@ -1289,6 +1355,24 @@ const server = http.createServer(async (req, res) => {
       const p = profile(match[1]),
         action = match[2];
       if (action === "status") return json(res, await status(p));
+      if(action==='delete'&&req.method==='POST'){
+        if(shuttingDown)throw Error('管理服务正在关闭');
+        const checkedStatus=async candidate=>{
+          if(standalone||candidate.backend==='native')return status(candidate);
+          const name=makeCommand(candidate,key).name;
+          try {
+            const c=JSON.parse((await docker(['inspect',name])).stdout)[0];
+            if(c.Config.Labels?.['sm75.managed']!=='v015-candidate')throw Error('拒绝操作非候选容器');
+            return {running:!!c.State.Running};
+          } catch(error){
+            if(/No such (?:object|container)/i.test(String(error.stderr||'')))return {running:false};
+            throw Error('无法确认模型状态，未删除配置');
+          }
+        };
+        const result=await deleteRuntimeProfile({id:p.id,profiles,profilesPath,store,status:checkedStatus,locks});
+        profiles=result.profiles;
+        return json(res,{ok:true,deleted:result.deleted});
+      }
       if (action === "history")
         return json(res, { points: telemetry.read(p.id) });
       if (action === "preview" && standalone)
@@ -1477,6 +1561,11 @@ if (standalone && (hasRuntimeOverrides(process.env) || process.env.SM75_LAUNCH_P
   try {
     const settings = store.settings();
     const boot = process.env.SM75_LAUNCH_PROFILE ? JSON.parse(process.env.SM75_LAUNCH_PROFILE) : null;
+    const deleted=deletedBootProfile(profiles,store,boot,process.env);
+    if(deleted){
+      store.put('startup','environment',{state:'deleted',profile:deleted,time:Date.now()});
+      console.log('已删除的运行配置不再从Docker参数重新导入：',deleted);
+    } else {
     const targetId = boot?.id || process.env.SM75_DEFAULT_PROFILE || settings.defaultProfile;
     const matchingModel = process.env.MODEL ? profiles.filter(p => p.args[0] === process.env.MODEL) : [];
     if (!targetId && matchingModel.length > 1) throw Error("同一模型有多个配置，请指定 SM75_DEFAULT_PROFILE");
@@ -1502,6 +1591,7 @@ if (standalone && (hasRuntimeOverrides(process.env) || process.env.SM75_LAUNCH_P
     if (boot || !settings.defaultProfile || process.env.SM75_DEFAULT_PROFILE)
       store.saveSettings({defaultProfile:imported.id,...(boot ? {autoStart:true} : {})}, profiles);
     store.put('startup','environment',{state:'applied',profile:imported.id,time:Date.now()});
+    }
   } catch (error) {
     runtimeImportError = error;
     store.put('startup','environment',{state:'failed',time:Date.now(),error:error.message});
@@ -1706,6 +1796,7 @@ process.on("SIGTERM", async () => {
   bridge.close();
   server.close();
   originalTests.close();
+  benchLocal.close();
   if (standalone) standalone.closing = true;
   for (const [id, cache] of nativeCaches) if (!native.has(id)) await cache.stop();
   await Promise.all([...pendingStarts]);

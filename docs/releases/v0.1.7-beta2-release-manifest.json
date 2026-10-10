@@ -1,0 +1,38 @@
+{
+  "release": "0.1.7-beta2",
+  "image": "vllm-sm75:v0.1.7-ultra-beta2",
+  "sourceTag": "v0.1.7-beta2",
+  "prerelease": true,
+  "upstream": {
+    "vllm": "0.30.0",
+    "vllmCommit": "ced6857afa0ea7b2e3f0846a62e1394e90f15607",
+    "cuda": "12.9",
+    "torch": "2.13.0",
+    "node": "22.23.2",
+    "harness": "0.1.7-alpha.2"
+  },
+  "build": {
+    "full": "docker/Dockerfile.ultra-full",
+    "existingUltra": "docker/Dockerfile.ultra",
+    "outputImages": 1,
+    "benchlocalSeparateImagesRequired": false
+  },
+  "benchlocal": {
+    "catalog": "ultra/source/benchlocal-native/catalog.json",
+    "packsLock": "ultra/source/benchlocal-native/packs-pins.json",
+    "assetsLock": "ultra/source/benchlocal-verifiers/assets.lock.json",
+    "pythonLock": "ultra/source/benchlocal-verifiers/hermes-requirements.lock",
+    "hermesCommit": "ea74f61d983ebdfd6a863c45761d1b38081f1d08",
+    "defaultSuites": 6,
+    "allSuites": 9,
+    "defaultCases": 90,
+    "allCases": 165
+  },
+  "inferenceModes": [
+    "base",
+    "mtp",
+    "dflash2",
+    "dspark"
+  ],
+  "standardMode": "SM75_EDITION=standard"
+}

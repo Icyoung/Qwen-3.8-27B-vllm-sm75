@@ -21,7 +21,7 @@ test('shared Next template contains all tested inference options',()=>{
  assert(!p.args.includes('--cpu-offload-params'));
 });
 test('Next profile CLI and panel resolve the identical model args, including quoted paths',()=>{
- const launcher=fileURLToPath(new URL('../../../../docker/helpers/runtime-entrypoint.py',import.meta.url));
+ const launcher=process.env.SM75_RUNTIME_HELPER_ROOT ? path.join(process.env.SM75_RUNTIME_HELPER_ROOT,'runtime-entrypoint.py') : fileURLToPath(new URL('../../../../docker/helpers/runtime-entrypoint.py',import.meta.url));
  for(const profileId of inferenceProfiles().map(p=>p.id))for(const model of ['/models/Next','/models/a "quoted" path']){
   const script='import importlib.util,json,sys; s=importlib.util.spec_from_file_location("entry",sys.argv[1]); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); print(json.dumps(m.load_profile(sys.argv[2],{"MODEL":sys.argv[3]})))';
   const got=JSON.parse(execFileSync(process.env.PYTHON||'python3',['-c',script,launcher,profileId,model],{encoding:'utf8'}));
@@ -52,8 +52,8 @@ test('switching from a Next configuration to 27B removes Next-only runtime wirin
  for(const flag of ['--engram-config','--enable-expert-parallel','--enable-ep-weight-filter','--language-model-only','--speculative-config'])assert(!result.args.includes(flag),flag);
  assert(!Object.keys(result.env).some(k=>k.startsWith('VLLM_SM75_QSA_')));
 });
-test('all six original 27B modes share the Docker/panel profile catalog',()=>{
- const profiles=inferenceProfiles().filter(p=>p.modelFamily==='qwen3_5');assert.equal(profiles.length,6);
+test('all original and DSpark 27B modes share the Docker/panel profile catalog',()=>{
+ const profiles=inferenceProfiles().filter(p=>p.modelFamily==='qwen3_5');assert.equal(profiles.length,8);assert.equal(profiles.filter(p=>p.id.includes('dspark')).length,2);
  for(const spec of profiles){
   const p=inferenceProfile(spec.id,'/models/target');
   assert.equal(argValue(p.args,'--tensor-parallel-size'),'4');
@@ -62,6 +62,7 @@ test('all six original 27B modes share the Docker/panel profile catalog',()=>{
   const draft=argValue(p.args,'--speculative-config');
   if(spec.id.includes('dflash2'))assert.equal(JSON.parse(draft).model,'/models/Qwen3.8-27B-DFlash2');
   else if(spec.id.includes('mtp5'))assert.equal(JSON.parse(draft).num_speculative_tokens,5);
+  else if(spec.id.includes('dspark')){assert.equal(JSON.parse(draft).method,'dspark');assert.equal(JSON.parse(draft).num_speculative_tokens,5);}
   else assert.equal(draft,null);
   assert.equal(createModelDraft({path:'/models/target',modelType:'qwen3_5',name:'27B',format:spec.format},null,{settings:{cacheRoot:'/cache'},cards:Array(4).fill({}),preset:spec.id}).profile.format,spec.format);
  }

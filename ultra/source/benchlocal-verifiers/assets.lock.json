@@ -1,0 +1,26 @@
+{
+  "go": {
+    "version": "1.21.13",
+    "url": "https://go.dev/dl/go1.21.13.linux-amd64.tar.gz",
+    "file": "go1.21.13.linux-amd64.tar.gz",
+    "sha256": "502fc16d5910562461e6a6631fb6377de2322aad7304bf2bcd23500ba9dab4a7"
+  },
+  "rust": {
+    "version": "1.78.0",
+    "url": "https://static.rust-lang.org/dist/rust-1.78.0-x86_64-unknown-linux-gnu.tar.xz",
+    "file": "rust-1.78.0-x86_64-unknown-linux-gnu.tar.xz",
+    "sha256": "ea144a052c0980dfbc6c84b3eda21e9f61b02b7b171787c7de80d7a8ad344ab3"
+  },
+  "chrome": {
+    "version": "155.0.8059.39",
+    "url": "https://storage.googleapis.com/chrome-for-testing-public/155.0.8059.39/linux64/chrome-linux64.zip",
+    "file": "chrome-linux64.zip",
+    "sha256": "55672d1f392fd3e7b7a08621b6e804e6bcb39d40cf155504abb74b3a021ea8ea"
+  },
+  "agent-browser": {
+    "version": "0.27.0",
+    "url": "https://registry.npmjs.org/agent-browser/-/agent-browser-0.27.0.tgz",
+    "file": "agent-browser-0.27.0.tgz",
+    "sha256": "62ef3bc80c75fc68cd70a45ec4ce981a67a4a95737580b67e8a4709afc28d875"
+  }
+}

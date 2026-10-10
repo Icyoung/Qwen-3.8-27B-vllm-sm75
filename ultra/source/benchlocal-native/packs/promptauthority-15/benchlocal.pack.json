@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "protocolVersion": 1,
+  "id": "promptauthority-15",
+  "name": "PromptAuthority-15",
+  "author": "stevibe",
+  "version": "1.0.0",
+  "description": "Deterministic prompt-authority conflict benchmark with binary canary grading and an HVC safety gate.",
+  "entry": "./dist/benchlocal/index.js",
+  "samplingDefaults": {
+    "temperature": 0
+  },
+  "theme": {
+    "accent": "#596b42"
+  },
+  "capabilities": {
+    "tools": true,
+    "multiTurn": true,
+    "streamingProgress": true,
+    "verification": false
+  }
+}

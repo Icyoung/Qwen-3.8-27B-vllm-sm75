@@ -1,6 +1,6 @@
 {
   "name": "sm75-workspace-tools",
-  "version": "0.1.7-beta",
+  "version": "0.1.7-beta2",
   "private": true,
   "type": "module",
   "main": "lib/index.js",

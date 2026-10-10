@@ -117,6 +117,9 @@ class DFlashSpeculator(DraftModelSpeculator):
             self.vllm_config.attention_config,
             use_non_causal=self.requires_non_causal,
         )
+        if self.speculative_config.method == "dspark":
+            from sm75_dspark_compat import draft_attention_config
+            config = draft_attention_config(config, self.num_query_per_req)
         return config
 
     def init_cudagraph_manager(self, cudagraph_mode: CUDAGraphMode) -> None:
@@ -139,7 +142,8 @@ class DFlashSpeculator(DraftModelSpeculator):
             cudagraph_mode = CUDAGraphMode.NONE
 
         self.query_cudagraph_manager = DFlashCudaGraphManager(
-            self.vllm_config,
+            self.attn_vllm_config if self.speculative_config.method == "dspark"
+            else self.vllm_config,
             self.device,
             cudagraph_mode,
             decode_query_len=self.num_query_per_req,

@@ -1,4 +1,30 @@
+import {mountBenchLocal} from './benchlocal-native-ui.js';
 import {mountApiAccess} from './api-access-ui.js';
+
+// Shared by the legacy form and the quick combination editor. Keep imported
+// method-specific/unknown fields when editing the same draft configuration.
+export function usesDraftModel(method) { return method === "dflash" || method === "dspark"; }
+export function speculationLabel(method) {
+  return ({dflash:"DFLASH2", dspark:"DSpark", mtp:"MTP"})[method] || (method && !["base","none"].includes(method) ? method : "普通推理");
+}
+export function buildSpeculativeSelection(previous = {}, {method, model = "", tokens, targetTp = 1} = {}) {
+  if (["base", "none"].includes(method)) return null;
+  if (!["mtp", "dflash", "dspark"].includes(method)) throw Error("请选择有效的加速方式");
+  const external = usesDraftModel(method);
+  if (external && !model) throw Error("请填写匹配的 " + speculationLabel(method) + " 草稿模型路径");
+  const same = previous?.method === method && (!external || previous.model === model);
+  const defaults = external ? {draft_tensor_parallel_size:Number(targetTp), kv_cache_dtype:"auto", attention_backend:"FLASHINFER", draft_sample_method:"probabilistic"} : {};
+  if (method === "dspark") Object.assign(defaults, {rejection_sample_method:"standard", enable_adaptive_verification:false});
+  const count = tokens ?? (same ? previous.num_speculative_tokens : undefined) ?? (method === "dflash" ? 7 : 5);
+  if (!Number.isSafeInteger(Number(count)) || Number(count) < 1) throw Error("投机 tokens 必须是正整数");
+  const spec = {...defaults, ...(same ? previous : {}), method, num_speculative_tokens:Number(count)};
+  if (external) {
+    spec.model = model;
+    if (!Number.isSafeInteger(spec.draft_tensor_parallel_size) || spec.draft_tensor_parallel_size < 1) throw Error("草稿 TP 卡数必须是正整数");
+  }
+  return spec;
+}
+
 // Shared workbench palette, including embedded console and monitoring frames.
 const SM75_UI_BUILD = "0.1.7-beta-debug-20260930";
 // Asset cache validation is handled by HTTP; never reload a live conversation for a build marker.
@@ -203,7 +229,7 @@ function installWorkbenchTheme() {
       (isolatedDocument
         ? "html{background:var(--bg)!important;color:var(--ink)!important}body{font-family:var(--sm75-ui-font-family)!important}select,input,textarea{color:var(--ink)!important}"
         : "@scope (body) to (.dsh-surface, body > :not(aside):not(main):not(script):not(style)) {") +
-      "body{background:var(--bg)!important;color:var(--ink)!important}:host{color:var(--ink)!important}:host button,main button,input,textarea,select,#sm75ThemeToggle{background:var(--field)!important;border-color:var(--line)!important}.card,.profile-card,.hardware-card,.chat-parameter-panel,.message{background:var(--card)!important;color:var(--ink)!important;border-color:var(--line)!important}.message.user{background:var(--field)!important}.chart-tip{background:var(--card)!important;color:var(--ink)!important}:is(body[data-sm75-benchmark],html[data-sm75-benchmark] body){background:var(--bg)!important;color:var(--ink)!important}:is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) :is(.container,.card,.panel,.config-section,.chart-container,.tab-content,.section,.config-card,#userCodeWidget,#chartContainer,#comparisonChartContainer,.question-card,table){background:var(--card)!important;color:var(--ink)!important;border-color:var(--line)!important}:is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) :is(h1,h2,h3,h4,label,p,summary){color:var(--ink)!important}:is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) #userCodeWidget *{color:var(--ink)!important}:is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) input,:is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) select{background:var(--field)!important}#sm75ThemeToggle{background:transparent!important;border:0;display:inline-flex;align-items:center;justify-content:center;padding:0;flex-shrink:0}button.primary{background:var(--primary)!important;color:var(--on-primary)!important;border-color:var(--primary)!important}input[role=switch]{background:var(--switch-off)!important}input[role=switch]:checked{background:var(--switch-on)!important}input[role=switch]:before{background:#fff!important}#sm75ThemeToggle[hidden]{display:none!important}#sm75ThemeToggle:hover{background:var(--field)!important}[class*=collapsed] [class*=logoRow]:has(#sm75ThemeToggle){height:auto;flex-wrap:wrap;overflow:visible}" +
+      "body{background:var(--bg)!important;color:var(--ink)!important}:host{color:var(--ink)!important}:host button:not(.bl-case):not(.profile-delete-button),main button:not(.bl-case):not(.profile-delete-button),input,textarea,select,#sm75ThemeToggle{background:var(--field)!important;border-color:var(--line)!important}.card,.profile-card,.hardware-card,.chat-parameter-panel,.message{background:var(--card)!important;color:var(--ink)!important;border-color:var(--line)!important}.message.user{background:var(--field)!important}.chart-tip{background:var(--card)!important;color:var(--ink)!important}:is(body[data-sm75-benchmark],html[data-sm75-benchmark] body){background:var(--bg)!important;color:var(--ink)!important}:is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) :is(.container,.card,.panel,.config-section,.chart-container,.tab-content,.section,.config-card,#userCodeWidget,#chartContainer,#comparisonChartContainer,.question-card,table){background:var(--card)!important;color:var(--ink)!important;border-color:var(--line)!important}:is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) :is(h1,h2,h3,h4,label,p,summary){color:var(--ink)!important}:is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) #userCodeWidget *{color:var(--ink)!important}:is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) input,:is(body[data-sm75-benchmark],html[data-sm75-benchmark] body) select{background:var(--field)!important}#sm75ThemeToggle{background:transparent!important;border:0;display:inline-flex;align-items:center;justify-content:center;padding:0;flex-shrink:0}button.primary{background:var(--primary)!important;color:var(--on-primary)!important;border-color:var(--primary)!important}input[role=switch]{background:var(--switch-off)!important}input[role=switch]:checked{background:var(--switch-on)!important}input[role=switch]:before{background:#fff!important}#sm75ThemeToggle[hidden]{display:none!important}#sm75ThemeToggle:hover{background:var(--field)!important}[class*=collapsed] [class*=logoRow]:has(#sm75ThemeToggle){height:auto;flex-wrap:wrap;overflow:visible}" +
       (isolatedDocument ? `
         /* These rules belong only to the existing, same-origin test documents.
            Native DSH buttons in the shared page keep their own component theme. */
@@ -556,7 +582,7 @@ if (globalThis.document?.body) installWorkbenchTheme();
 
 import { mountLiveSummary, metricLevel as gpuLevel } from "/live-summary.js";
 import {readContextSettings, applyContextSettings, argValue as readArgument, setArg, oneMillionContext, retargetContextModel} from "./context-config.js";
-import {validateLMCacheProfile, isLMCacheEnabled} from "./lmcache-config.js";
+import {validateLMCacheProfile, isLMCacheEnabled, lmcacheLayoutKey, lmcacheDefaultDiskPath, lmcacheHintsFromLog} from "./lmcache-config.js";
 
 // The dedicated form edits the argv stored by profiles/templates. This binding
 // can be exercised without mounting the rest of the console or starting an engine.
@@ -633,12 +659,43 @@ export function bindContextEditor(document, {getArgs, setArgs, getMetadata = () 
   return {refresh, flush};
 }
 
-export function bindLMCacheEditor(document, {getProfile, setProfile, beforeApply = () => {}, onApply = () => {}, onDirty = () => {}, run = fn => fn}) {
+export function bindLMCacheEditor(document, {getProfile, setProfile, beforeApply = () => {}, onApply = () => {}, onDirty = () => {}, loadHints = null, run = fn => fn}) {
   const $ = id => document.getElementById(id);
   const fields = {cpuGiB: "lmcacheCpuGiB", chunkSize: "lmcacheChunkSize", diskPath: "lmcacheDiskPath",
     minFreeDiskGiB: "lmcacheMinFreeDiskGiB", port: "lmcachePort", httpPort: "lmcacheHttpPort"};
   const defaults = {cpuGiB: 8, chunkSize: "", diskPath: "", minFreeDiskGiB: 4, port: 5555, httpPort: 5556};
   let dirty = false, selection = "default", nativeDraft = null;
+  let hint=null, requestedKey='', hintPending=false, requestEpoch=0;
+  const currentKey=() => JSON.stringify([getProfile().id || '',lmcacheLayoutKey(getProfile())]);
+  const currentHint=() => requestedKey===currentKey() ? hint : null;
+  function renderHints() {
+    const detected=currentHint(), pending=hintPending && requestedKey===currentKey();
+    const chunk=$("lmcacheChunkSize"), disk=$("lmcacheDiskPath");
+    chunk.placeholder=detected ? `自动：${detected.chunkSize}` : pending ? '正在自动识别…' : '自动识别；暂无匹配记录';
+    const message=detected
+      ? `默认 ${detected.chunkSize} tokens；引擎实际块大小 ${detected.blockSize}。留空使用此默认值，手动值须为 ${detected.blockSize} 的整数倍。`
+      : pending ? '正在读取本配置的最近运行参数，无需手动查看日志。'
+      : '尚无匹配的运行记录。可先用默认缓存方案启动一次本配置，之后自动识别；也可填写已知有效的块大小。';
+    if($("lmcacheChunkHint")) $("lmcacheChunkHint").textContent=message;
+    const recommended=lmcacheDefaultDiskPath(getProfile());
+    disk.placeholder=recommended;
+    if($("lmcacheDiskHint")) $("lmcacheDiskHint").textContent=`留空仅使用 CPU；推荐 ${recommended}（容器内）。点击“使用推荐目录”启用磁盘层，目录在模型启动时自动创建；宿主位置由 Docker 缓存路径映射决定。`;
+  }
+  function requestHints(force=false) {
+    renderHints();
+    if(!loadHints || $("cacheBackend").value!=='lmcache')return;
+    const key=currentKey();
+    if(key===requestedKey && (!force || hintPending))return;
+    const epoch=++requestEpoch, snapshot=structuredClone(getProfile());
+    requestedKey=key;hint=null;hintPending=true;renderHints();
+    Promise.resolve().then(()=>loadHints(snapshot)).then(value=>{
+      if(epoch!==requestEpoch || currentKey()!==key)return;
+      hint=value?.blockSize>0 ? value : null;
+    }).catch(()=>{}).finally(()=>{
+      if(epoch!==requestEpoch || currentKey()!==key)return;
+      hintPending=false;renderHints();
+    });
+  }
   const nativeValues = () => ({mode: $("ctxCpuKvMode").value, gib: $("ctxCpuKvGiB").value});
   function restoreNative() {
     if (!nativeDraft) return;
@@ -655,6 +712,7 @@ export function bindLMCacheEditor(document, {getProfile, setProfile, beforeApply
     const value = {...getProfile().lmcache, enabled: $("cacheBackend").value === "lmcache"};
     for (const [name, id] of Object.entries(fields)) value[name] = name === "diskPath" ? $(id).value.trim()
       : $(id).value.trim() === "" ? null : Number($(id).value);
+    if (value.chunkSize === null && currentHint()) value.chunkSize = currentHint().chunkSize;
     return value;
   }
   function status() {
@@ -671,16 +729,18 @@ export function bindLMCacheEditor(document, {getProfile, setProfile, beforeApply
     if (mode === "custom") notes.push("已有自定义缓存连接器，请在高级参数中修改；切换方案不会删除它。");
     if (enabled) {
       if (mode === "native") notes.push("保存时将用 LMCache 替换原生 CPU KV。");
-      if (readArgument(getProfile().args, "--speculative-config") !== null) notes.push("请先关闭 DFlash/MTP 投机解码，再启用 LMCache。");
+      if (readArgument(getProfile().args, "--speculative-config") !== null) notes.push("LMCache 暂不支持 DSpark / DFlash / MTP；请先在加速设置中关闭投机解码，草稿配置不会自动删除。");
       if (getProfile().power?.mode === "sleep") notes.push("请先将电源模式改为 P-State；LMCache 暂不支持释放显存的休眠。");
       if (notes.length === 0) notes.push("保存后下次启动生效；依赖与缓存服务在启动时检查。");
     }
     $("lmcacheStatus").textContent = notes.join("\n");
+    renderHints();
   }
   function refresh(force = false) {
     if (dirty && !force) {
       if (selection !== "default") restoreNative();
       status();
+      requestHints();
       return;
     }
     const profile = getProfile(), config = profile.lmcache || {};
@@ -693,9 +753,11 @@ export function bindLMCacheEditor(document, {getProfile, setProfile, beforeApply
     dirty = false;
     if (selection !== "default") restoreNative();
     status();
+    requestHints(force);
   }
   function flush() {
-    if (!dirty) return false;
+    const needsDefault = $("cacheBackend").value === "lmcache" && $("lmcacheChunkSize").value.trim() === "";
+    if (!dirty && !needsDefault) return false;
     beforeApply();
     const profile = getProfile(), selected = $("cacheBackend").value, mode = connectorMode();
     if (!["default", "lmcache", "custom"].includes(selected)) throw Error("缓存方案无效");
@@ -705,6 +767,10 @@ export function bindLMCacheEditor(document, {getProfile, setProfile, beforeApply
     if (selected === "lmcache" && mode === "native")
       for (const key of ["--kv-transfer-config", "--kv-offloading-size", "--kv-offloading-backend"]) args = setArg(args, key, null);
     const next = {...profile, args, lmcache: values()};
+    if (selected === "lmcache" && next.lmcache.chunkSize === null)
+      throw Error(hintPending && requestedKey===currentKey() ? "LMCache chunk size 正在自动识别，请稍后保存" : "LMCache chunk size 尚未识别；请先用默认缓存启动本配置一次，或填写已知有效值");
+    if (selected === "lmcache" && currentHint() && next.lmcache.chunkSize % currentHint().blockSize !== 0)
+      throw Error(`缓存块大小须为 ${currentHint().blockSize} 或其整数倍`);
     validateLMCacheProfile(next); // Validate conflicts and sizes before replacing native KV.
     setProfile(next);
     dirty = false;
@@ -722,12 +788,17 @@ export function bindLMCacheEditor(document, {getProfile, setProfile, beforeApply
     dirty = true;
     onDirty();
     status();
+    requestHints();
   }
   $("cacheBackend").addEventListener("change", changed);
   $("lmcacheSettings").addEventListener("input", changed);
   $("lmcacheSettings").addEventListener("change", changed);
   $("nativeCacheFields").addEventListener("input", () => {nativeDraft = nativeValues();});
   $("nativeCacheFields").addEventListener("change", () => {nativeDraft = nativeValues();});
+  if ($("lmcacheUseDiskDefault")) $("lmcacheUseDiskDefault").onclick = run(() => {
+    $("lmcacheDiskPath").value=lmcacheDefaultDiskPath(getProfile());
+    changed();
+  });
   if ($("lmcacheApply")) $("lmcacheApply").onclick = run(() => {dirty = true; flush(); onApply();});
   if ($("lmcacheReplaceNative")) $("lmcacheReplaceNative").onclick = run(() => {
     $("cacheBackend").value = "lmcache";
@@ -1048,6 +1119,11 @@ export function mountConsole(document = globalThis.document, options = {}) {
   });
 
   const lmcacheEditor = bindLMCacheEditor(document, {
+    loadHints: async profile => {
+      if (disposed || authState !== "authenticated" || !profile.id) return null;
+      const logs = await api(`/api/profiles/${encodeURIComponent(profile.id)}/logs?offset=0`);
+      return lmcacheHintsFromLog(profile, logs.text || "");
+    },
     getProfile: () => ({...(editorBase || {}), port: 8000, args: JSON.parse($("args").value),
       power: {...editorBase?.power, mode: $("powerMode").value}}),
     setProfile: profile => {
@@ -1318,10 +1394,7 @@ export function mountConsole(document = globalThis.document, options = {}) {
     contextEditor.refresh(true);
     lmcacheEditor.refresh(true);
     $("binds").value = JSON.stringify(p.binds || [], null, 2);
-    const val = (name, fallback) => {
-      const i = p.args.indexOf(name);
-      return i >= 0 ? p.args[i + 1] : fallback;
-    };
+    const val = (name, fallback) => readArgument(p.args, name, fallback);
     $("modelPath").value = p.args[0];
     for (const [id, flag, fallback] of [
       ["tp", "--tensor-parallel-size", "4"],
@@ -1377,7 +1450,9 @@ export function mountConsole(document = globalThis.document, options = {}) {
     benchmarkSignature = "";
   const benchmarkTypes = ["speedtest", "sql"],
     benchmarkPending = new Set();
+  const benchLocalUI=mountBenchLocal({api,run,getProfile:()=>active});
   async function refreshBenchmarks() {
+    await benchLocalUI.refresh();
     await Promise.all(
       benchmarkTypes.map(async (type) => {
         if (benchmarkPending.has(type)) return;
@@ -1704,12 +1779,8 @@ export function mountConsole(document = globalThis.document, options = {}) {
   $('save').onclick = run(() => saveEdited());
   $('saveAndStart').onclick = run(() => saveEdited(true));
   $("applyParams").onclick = run(() => {
-    const args = contextArgsForModel($("modelPath").value);
-    function put(k, v) {
-      const i = args.indexOf(k);
-      if (i >= 0) args.splice(i, 2);
-      if (v !== null) args.push(k, String(v));
-    }
+    let args = contextArgsForModel($("modelPath").value);
+    const put = (k, v) => { args = setArg(args, k, v); };
     for (const [id, flag] of [
       ["tp", "--tensor-parallel-size"],
       ["seq", "--max-num-seqs"],
@@ -1724,24 +1795,8 @@ export function mountConsole(document = globalThis.document, options = {}) {
       put("--speculative-config", null);
       put("--scheduler-cls", null);
     } else {
-      if (mode === "dflash" && !$("draftPath").value)
-        throw Error("填写匹配的草稿模型路径");
-      const si = args.indexOf("--speculative-config"),
-        previous = si >= 0 ? JSON.parse(args[si + 1]) : {},
-        same = previous.method === mode;
-      const spec = {
-        ...(same ? previous : {}),
-        method: mode,
-        num_speculative_tokens: same
-          ? (previous.num_speculative_tokens ?? (mode === "mtp" ? 5 : 7))
-          : mode === "mtp"
-            ? 5
-            : 7,
-      };
-      if (mode === "dflash") {
-        spec.model = $("draftPath").value;
-        spec.draft_tensor_parallel_size = Number($("tp").value);
-      }
+      const previous = JSON.parse(readArgument(args, "--speculative-config", "{}"));
+      const spec = buildSpeculativeSelection(previous, {method:mode, model:$("draftPath").value, targetTp:Number($("tp").value)});
       put("--speculative-config", JSON.stringify(spec));
       put("--scheduler-cls", "vllm.v1.core.sched.scheduler_sm75.SM75Scheduler");
     }
@@ -2593,6 +2648,22 @@ export function mountConsole(document = globalThis.document, options = {}) {
       ? "完整配置已导出（不含 API Key）。"
       : "完整配置已复制（不含 API Key）。";
   }
+  async function deleteProfile(p) {
+    if(!p)throw Error('配置不存在或已删除');
+    if(profileState[p.id]?.running)throw Error('该配置正在运行，请先停止模型再删除');
+    const editing=!$('profileEditor').hidden&&$('pid').value===p.id;
+    const notes=['只删除这项运行配置，保留模型文件、缓存和会话。'];
+    if(globalSettings.defaultProfile===p.id)notes.push('同时取消此配置的默认启动设置。');
+    if(globalSettings.defaultChatProfile===p.id)notes.push('同时取消此配置的默认会话设置。');
+    if(editing&&editorDirty)notes.push('该配置尚未保存的修改也会丢弃。');
+    if(!confirm('删除配置「'+profileLabel(p)+'」？\n\n'+notes.join('\n')))return;
+    await api('/console-api/profiles/'+encodeURIComponent(p.id)+'/delete',{});
+    if(editing)closeEditor();
+    delete profileState[p.id];profilesSignature='';
+    if(active===p.id)active=runningProfile&&runningProfile!==p.id?runningProfile:'';
+    await load();populateModelSources();await refreshProfileCards();
+    $('notice').textContent='配置已删除，备份已保留。';
+  }
   function closeEditor() {
     modelSourceGeneration++;
     setModelSourceLoading(false);
@@ -2673,25 +2744,36 @@ export function mountConsole(document = globalThis.document, options = {}) {
         card.dataset.profile = p.id;
         const title = document.createElement("h3");
         title.textContent = profileLabel(p);
+        const heading=document.createElement('div');heading.className='profile-card-heading';
+        const remove=document.createElement('button');
+        remove.type='button';remove.className='profile-delete-button';remove.dataset.profileDelete=p.id;
+        remove.disabled=!!profileState[p.id]?.running;
+        remove.title=remove.disabled?'正在运行，停止模型后可删除':'删除配置';
+        remove.ariaLabel='删除配置 '+profileLabel(p);
+        remove.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M5 6l1 14a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1l1-14M10 10v7M14 10v7"/></svg>';
+        remove.onclick=run(async()=>{
+          if(remove.disabled)return;remove.disabled=true;
+          try{await deleteProfile(profiles.find(row=>row.id===p.id));}
+          finally{remove.disabled=!!profileState[p.id]?.running;}
+        });
+        heading.append(title,remove);
         const arg = (k) => {
-          const i = p.args.indexOf(k);
-          return i >= 0 ? p.args[i + 1] : null;
+          const i = p.args.findIndex(value => value === k || value.startsWith(k + "="));
+          return i < 0 ? null : p.args[i].startsWith(k + "=") ? p.args[i].slice(k.length + 1) : p.args[i + 1];
         };
         let spec = {};
         try {
           spec = JSON.parse(arg("--speculative-config") || "{}");
         } catch {}
         const description = document.createElement("p");
+        description.className='profile-card-description';
         description.textContent = [
           p.args[0].split("/").at(-1),
           p.format.toUpperCase(),
-          spec.method === "dflash"
-            ? "DFLASH2"
-            : spec.method === "mtp"
-              ? "MTP"
-              : "普通推理",
+          spec.method === "dspark" ? "DSpark" : spec.method === "dflash" ? "DFLASH2" : spec.method === "mtp" ? "MTP" : "普通推理",
         ].join(" · ");
         const facts = document.createElement("p");
+        facts.className='profile-card-facts';
         facts.textContent =
           "上下文 " +
           (arg("--max-model-len") || "自动") +
@@ -2704,10 +2786,12 @@ export function mountConsole(document = globalThis.document, options = {}) {
             ? "P-State 常驻"
             : "休眠 " + (arg("--auto-sleep-idle-timeout") || "0") + " 分");
         const st = document.createElement("p");
-        st.className = profileState[p.id]?.running ? "ok" : "";
+        st.className = 'profile-card-status'+(profileState[p.id]?.running?' ok':'');
         st.textContent = profileState[p.id]?.running ? "运行中" : "未运行";
         const actions = document.createElement("div");
-        actions.className = "actions";
+        actions.className = "actions profile-card-actions";
+        const mainActions=document.createElement('div'),shareActions=document.createElement('div');
+        mainActions.className='profile-card-main-actions';shareActions.className='profile-card-share-actions';
         for (const [label, fn] of [
           [
             profileState[p.id]?.running ? "停止" : "启动",
@@ -2723,11 +2807,14 @@ export function mountConsole(document = globalThis.document, options = {}) {
           ["导出配置", () => shareProfile(profiles.find(row => row.id === p.id), true)],
         ]) {
           const b = document.createElement("button");
+          b.type='button';
           b.textContent = label;
           b.onclick = run(fn);
-          actions.append(b);
+          (label==='复制完整配置'||label==='导出配置'?shareActions:mainActions).append(b);
         }
-        card.append(title, description, facts, st, actions);
+        actions.append(mainActions,shareActions);
+        const footer=document.createElement('div');footer.className='profile-card-footer';footer.append(st,actions);
+        card.append(heading, description, facts, footer);
         return card;
       }),
     );
@@ -2824,7 +2911,7 @@ export function mountConsole(document = globalThis.document, options = {}) {
     } catch {}
     $("chooseMtp").classList.toggle("selected", method === "mtp");
     $("chooseDflash").classList.toggle("selected", method === "dflash");
-    $("draftChoiceLabel").hidden = method !== "dflash";
+    $("draftChoiceLabel").hidden = !usesDraftModel(method);
     $("sleepIdle").value =
       Number(argValue("--auto-sleep-idle-timeout")) > 0
         ? Number(argValue("--auto-sleep-idle-timeout"))
@@ -2884,7 +2971,9 @@ export function mountConsole(document = globalThis.document, options = {}) {
     if ($("draftPath").value) $("setAcceleration").click();
   };
   $("draftPath").onchange = () => {
-    $("variant").value = "dflash";
+    const selected = $("comboAccel").value;
+    $("variant").value = usesDraftModel(selected) ? selected
+      : usesDraftModel($("variant").value) ? $("variant").value : "dflash";
     $("setAcceleration").click();
   };
   $("accelEnabled").addEventListener("change", () => {
@@ -2949,7 +3038,7 @@ export function mountConsole(document = globalThis.document, options = {}) {
     $("comboVramTotal").textContent = tp && vr ? tp * vr + " GiB" : "—";
     const acc = $("comboAccel").value;
     $("comboMtpRow").hidden = acc !== "mtp";
-    $("comboDflashRow").hidden = acc !== "dflash";
+    $("comboDflashRow").hidden = !usesDraftModel(acc);
     $("offloadBody").hidden = true;
   }
   function comboFillModels() {
@@ -3002,7 +3091,7 @@ export function mountConsole(document = globalThis.document, options = {}) {
       spec.method === "mtp" && tok >= 1 && tok <= 8 ? tok : 5,
     );
     $("comboDraftTokens").value = String(
-      spec.method === "dflash" && tok >= 1 && tok <= 8 ? tok : 7,
+      usesDraftModel(spec.method) && tok >= 1 && tok <= 8 ? tok : spec.method === "dspark" ? 5 : 7,
     );
     const cpu = readCpuCompatibility(JSON.parse($("args").value));
     $("comboCpuKv").value = cpu.cpuKvMode === "native" ? "on" : "off";
@@ -3017,7 +3106,14 @@ export function mountConsole(document = globalThis.document, options = {}) {
       localStorage.setItem("sm75-combo-vram", $("comboVram").value);
     syncComboBodies();
   };
-  $("comboAccel").onchange = $("comboCpuKv").onchange = syncComboBodies;
+  $("comboAccel").onchange = () => {
+    const selected = $("comboAccel").value;
+    const previous = JSON.parse(argValue("--speculative-config") || "{}");
+    if (usesDraftModel(selected) && previous.method !== selected)
+      $("comboDraftTokens").value = selected === "dspark" ? "5" : "7";
+    syncComboBodies();
+  };
+  $("comboCpuKv").onchange = syncComboBodies;
   $("comboApply").onclick = run(async () => {
     if (!Array.isArray(catalog) || !catalog.length) {
       try {
@@ -3033,12 +3129,12 @@ export function mountConsole(document = globalThis.document, options = {}) {
     if (!m)
       throw Error("未选择模型：请先到模型库下载/导入模型，再在组合里选择");
     let draftPath = "";
-    if (accel === "dflash") {
+    if (usesDraftModel(accel)) {
       draftPath = $("draftPath").value;
       const d = (catalog || []).find((x) => x.path === draftPath);
-      if (!d) throw Error("请先到模型库下载 DFlash2 草稿模型，并在下方选中");
+      if (!d) throw Error("请先到模型库下载匹配的 " + speculationLabel(accel) + " 草稿模型，并在下方选中");
     }
-    const seqs = COMBO_SEQS[scene],
+    const seqs = accel === "dspark" && scene === "single" ? 1 : COMBO_SEQS[scene],
       util = COMBO_UTIL[m.format === "fp8" ? "fp8" : "awq"],
       batch = 8192;
     let args = contextArgsForModel(m.path);
@@ -3052,30 +3148,12 @@ export function mountConsole(document = globalThis.document, options = {}) {
     if (accel === "none") {
       put("--speculative-config", null);
       put("--scheduler-cls", null);
-    } else if (accel === "mtp") {
-      put(
-        "--speculative-config",
-        JSON.stringify({
-          ...(previousSpec.method === "mtp" ? previousSpec : {}),
-          method: "mtp",
-          num_speculative_tokens: Number($("comboMtpTokens").value) || 5,
-        }),
-      );
-      put("--scheduler-cls", COMBO_SCHED);
     } else {
-      put(
-        "--speculative-config",
-        JSON.stringify({
-          ...(previousSpec.method === "dflash" && previousSpec.model === draftPath ? previousSpec : {}),
-          method: "dflash",
-          model: draftPath,
-          num_speculative_tokens: Number($("comboDraftTokens").value) || 7,
-          draft_tensor_parallel_size: tp,
-          kv_cache_dtype: "auto",
-          attention_backend: "FLASHINFER",
-          draft_sample_method: "probabilistic",
-        }),
-      );
+      const spec = buildSpeculativeSelection(previousSpec, {
+        method:accel, model:draftPath, targetTp:tp,
+        tokens:Number(accel === "mtp" ? $("comboMtpTokens").value : $("comboDraftTokens").value),
+      });
+      put("--speculative-config", JSON.stringify(spec));
       put("--scheduler-cls", COMBO_SCHED);
     }
     $("args").value = JSON.stringify(args, null, 2);
@@ -3098,7 +3176,7 @@ export function mountConsole(document = globalThis.document, options = {}) {
       (readArgument(args, "--max-model-len") || "auto") +
       " · seqs " +
       seqs +
-      (accel !== "none" ? " · " + accel.toUpperCase() : "");
+      (accel !== "none" ? " · " + speculationLabel(accel) : "");
   });
   function syncPower() {
     const p = $("powerMode").value === "pstate";
@@ -3563,8 +3641,8 @@ export function mountConsole(document = globalThis.document, options = {}) {
       i = a.indexOf("--speculative-config");
     let mode = "普通推理";
     try {
-      const m = JSON.parse(a[i + 1] || "{}").method;
-      mode = m === "dflash" ? "DFLASH2" : m === "mtp" ? "MTP" : "普通推理";
+      const m = JSON.parse(readArgument(a, "--speculative-config", "{}")).method;
+      mode = speculationLabel(m);
     } catch {}
     return (
       (p.id.includes("awq") ? "低显存长上下文" : "单人长上下文") + " · " + mode
@@ -3610,6 +3688,8 @@ export function mountConsole(document = globalThis.document, options = {}) {
     kv_cache_dtype: "缓存精度",
     attention_backend: "注意力后端",
     draft_sample_method: "草稿采样方式",
+    rejection_sample_method: "拒绝采样方式",
+    enable_adaptive_verification: "自适应验证",
     kv_connector: "缓存连接器",
     kv_role: "缓存角色",
     kv_connector_extra_config: "缓存设置",
@@ -3738,7 +3818,7 @@ export function mountConsole(document = globalThis.document, options = {}) {
         : label;
       let input;
       const options = label.endsWith("加速方式")
-        ? ["dflash", "mtp"]
+        ? ["dflash", "dspark", "mtp"]
         : label === "休眠模式"
           ? ["exit", "reload", "cpu"]
           : label === "KV 缓存精度" || label.endsWith(" · 缓存精度")
@@ -3766,6 +3846,7 @@ export function mountConsole(document = globalThis.document, options = {}) {
             new Option(
               {
                 dflash: "DFLASH2",
+                dspark: "DSpark",
                 mtp: "多令牌预测（MTP）",
                 exit: "退出引擎，按需唤醒",
                 reload: "卸载后重新加载",
@@ -4079,35 +4160,16 @@ export function mountConsole(document = globalThis.document, options = {}) {
   };
 
   $("setAcceleration").onclick = run(() => {
-    const args = JSON.parse($("args").value);
-    const put = (k, v) => {
-      const i = args.indexOf(k);
-      if (i >= 0) args.splice(i, 2);
-      if (v !== null) args.push(k, v);
-    };
+    let args = JSON.parse($("args").value);
+    const put = (k, v) => { args = setArg(args, k, v); };
     const mode = $("variant").value;
     if (mode === "base") {
       put("--speculative-config", null);
       put("--scheduler-cls", null);
     } else {
-      const i = args.indexOf("--speculative-config"),
-        old = i >= 0 ? JSON.parse(args[i + 1]) : {},
-        same = old.method === mode;
-      const spec = {
-        ...(same ? old : {}),
-        method: mode,
-        num_speculative_tokens: same
-          ? old.num_speculative_tokens
-          : mode === "mtp"
-            ? 5
-            : 7,
-      };
-      if (mode === "dflash") {
-        if (!$("draftPath").value) throw Error("请填写匹配的草稿模型路径");
-        spec.model = $("draftPath").value;
-        const ti = args.indexOf("--tensor-parallel-size");
-        spec.draft_tensor_parallel_size = ti >= 0 ? Number(args[ti + 1]) : 1;
-      }
+      const previous = JSON.parse(readArgument(args, "--speculative-config", "{}"));
+      const spec = buildSpeculativeSelection(previous, {method:mode, model:$("draftPath").value,
+        targetTp:Number(readArgument(args, "--tensor-parallel-size", "1"))});
       put("--speculative-config", JSON.stringify(spec));
       put("--scheduler-cls", "vllm.v1.core.sched.scheduler_sm75.SM75Scheduler");
     }

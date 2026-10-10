@@ -1,3 +1,4 @@
+import {preflightCpuKV} from './cpu-kv-resources.mjs';
 import {isLMCacheEnabled} from './public/lmcache-config.js';
 import {ManagedLMCache, preflightLMCache, lmcacheEnvironment} from './lmcache-runtime.mjs';
 import { managedHarnessConfig, harnessPatch, legacyHarnessConfig } from "./harness-config.mjs";
@@ -29,6 +30,7 @@ export function writeHarnessFile(file, text) {
 export class Standalone {
   constructor(root, key, options = {}) {
     this.preflightLMCache = options.preflight || preflightLMCache;
+    this.preflightCpuKV = options.preflightCpuKV || preflightCpuKV;
     this.onEngineChange = options.onEngineChange || (() => {});
     this.root = root;
     this.key = key;
@@ -142,6 +144,7 @@ export class Standalone {
     let cacheRuntime, engineChild, cacheFailed = false;
     try {
       if (this.cacheCleanup) { await this.cacheCleanup; this.cacheCleanup = null; }
+      await this.preflightCpuKV(p);
       if (isLMCacheEnabled(p)) {
         const checked = await this.preflightLMCache(p, {standalone: true});
         if (this.closing) throw Error("管理服务正在关闭");
@@ -219,7 +222,7 @@ export class Standalone {
         await this.terminate(child);
         throw Error("LMCache 服务在模型启动期间退出，已停止本次模型进程");
       }
-      this.engine = { id: p.id, child, phase:'starting', apiKey };
+      this.engine = { id: p.id, child, phase:'starting', apiKey, profile:structuredClone(p) };
       this.onEngineChange();
       child.once("exit", async () => {
         if (cacheRuntime) {

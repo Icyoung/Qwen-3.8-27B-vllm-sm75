@@ -83,7 +83,8 @@ for ((gpu_index=1; gpu_index<tp; gpu_index++)); do pstate_default_gpus+=",$gpu_i
 seq=4; batch=8192; util=0.87; length=auto; kv=0
 [[ "$FORMAT" != awq ]] || { seq=8; batch=16384; }
 VERSION="$(tr -d ' \r\n' < "$SCRIPT_DIR/VERSION")"
-image="vllm-sm75:v${VERSION}"
+image="vllm-sm75:v${VERSION/-beta/-ultra-beta}"
+[[ "$VERSION" == *-beta* ]] || image="vllm-sm75:v${VERSION}-ultra"
 image="${IMAGE:-$image}"
 graph='{"cudagraph_mode":"FULL_AND_PIECEWISE"}'
 extra=()
@@ -207,7 +208,7 @@ done
 
 default_attention='{"backend":"FLASHINFER"}'
 docker run --detach --name "${CONTAINER_NAME:-vllm-sm75-$VARIANT-$FORMAT}" \
-  --gpus "${GPUS:-all}" --shm-size 16g --ulimit nofile=1048576:1048576 \
+  --gpus "${GPUS:-all}" --shm-size "${SHM_SIZE:-32g}" --ulimit nofile=1048576:1048576 \
   --publish "${PORT:-8000}:8000" "${mounts[@]}" \
   --env VLLM_USE_MODELSCOPE="${VLLM_USE_MODELSCOPE-true}" --env MODELSCOPE_CACHE=/root/.cache/modelscope/hub \
   --env VLLM_GDN_DECODE_KERNEL="${VLLM_GDN_DECODE_KERNEL-triton}" --env VLLM_USE_FLASHINFER_SAMPLER="${VLLM_USE_FLASHINFER_SAMPLER-0}" \
@@ -220,7 +221,7 @@ docker run --detach --name "${CONTAINER_NAME:-vllm-sm75-$VARIANT-$FORMAT}" \
   --env VLLM_FIREFLY_AR_BACKEND="${VLLM_FIREFLY_AR_BACKEND:-auto}" \
   --env VLLM_FIREFLY_AR_MIN_SIZE="${VLLM_FIREFLY_AR_MIN_SIZE:-1048576}" \
   --env OMP_NUM_THREADS="${OMP_NUM_THREADS-2}" --env MAX_JOBS="${MAX_JOBS-1}" --env NVCC_THREADS="${NVCC_THREADS:-1}" --env TORCHINDUCTOR_COMPILE_THREADS="${TORCHINDUCTOR_COMPILE_THREADS-1}" \
-  --env VLLM_API_KEY "${runtime_env[@]}" "${pstate_env[@]}" "${entrypoint[@]}" "$image" "$MODEL" --served-model-name "$SERVE_NAME" \
+  --env SM75_EDITION=standard --env VLLM_API_KEY "${runtime_env[@]}" "${pstate_env[@]}" "${entrypoint[@]}" "$image" "$MODEL" --served-model-name "$SERVE_NAME" \
   --host 0.0.0.0 --port 8000 \
   --tensor-parallel-size "$tp" \
   --max-num-seqs "${MAX_NUM_SEQS:-$seq}" --max-num-batched-tokens "${MAX_NUM_BATCHED_TOKENS:-$batch}" \

@@ -1,0 +1,45 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import net from 'node:net';
+import {spawn} from 'node:child_process';
+import {once} from 'node:events';
+import {fileURLToPath} from 'node:url';
+const delay=ms=>new Promise(r=>setTimeout(r,ms));
+async function freePort(){const s=net.createServer();await new Promise(r=>s.listen(0,'127.0.0.1',r));const port=s.address().port;await new Promise(r=>s.close(r));return port;}
+
+test('authenticated delete API removes only selected profiles, clears defaults and survives restart',async t=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'sm75-profile-delete-http-')),port=await freePort(),proxyPort=await freePort();
+  const base='http://127.0.0.1:'+port,server=fileURLToPath(new URL('../server.mjs',import.meta.url));let child;
+  const launch=async(overrides={})=>{child=spawn(process.execPath,[server],{env:{...process.env,SM75_SINGLE_CONTAINER:'0',SM75_CONSOLE_ROOT:root,SM75_CONSOLE_HOST:'127.0.0.1',SM75_CONSOLE_PORT:String(port),SM75_HARNESS_PROXY_PORT:String(proxyPort),...overrides},stdio:'ignore'});for(let n=0;n<100;n++){if(child.exitCode!==null)throw Error('fixture server exited');try{if((await fetch(base)).ok)return;}catch{}await delay(30);}throw Error('fixture server did not start');};
+  const stop=async()=>{if(child?.exitCode===null){const exited=once(child,'exit');child.kill('SIGTERM');await exited;}};
+  t.after(async()=>{await stop();assert.equal(path.dirname(root),os.tmpdir());assert.ok(path.basename(root).startsWith('sm75-profile-delete-http-'));fs.rmSync(root,{recursive:true,force:true});});
+  await launch();
+  const headers={Authorization:'Bearer '+fs.readFileSync(path.join(root,'key'),'utf8').trim(),'Content-Type':'application/json'};
+  const call=(route,data,extra={})=>fetch(base+'/console-api/'+route,{method:data?'POST':'GET',headers:{...headers,...extra},body:data?JSON.stringify(data):undefined});
+  const p=id=>({id,name:id,backend:'native',format:'fp8',port:18900,args:[path.join(root,'model')],cacheRoot:path.join(root,'cache')});
+  for(const id of ['one','two'])assert.equal((await call('profiles',p(id))).status,200);
+  await call('settings',{defaultProfile:'two',defaultChatProfile:'one',autoStart:true});
+  await call('chats/one',{messages:[{role:'user',content:'retain fixture conversation'}]});
+  const chat=fs.readFileSync(path.join(root,'chats/one.json'),'utf8');
+  assert.equal((await fetch(base+'/console-api/profiles/one/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).status,401);
+  assert.equal((await call('profiles/one/delete',{}, {Origin:'http://untrusted.invalid'})).status,403);
+  assert.equal((await call('profiles/one/delete',{})).status,200);
+  assert.equal(fs.readFileSync(path.join(root,'chats/one.json'),'utf8'),chat);
+  let settings=await (await call('settings')).json();assert.equal(settings.defaultProfile,'two');assert.equal(settings.defaultChatProfile,'');assert.equal(settings.autoStart,true);
+  assert.equal((await call('profiles/one/delete',{})).status,400);
+  assert.equal((await call('profiles/two/delete',{})).status,200);
+  assert.deepEqual(await(await call('profiles')).json(),[]);
+  settings=await(await call('settings')).json();assert.equal(settings.defaultProfile,'');assert.equal(settings.autoStart,false);
+  await stop();await launch();assert.deepEqual(await(await call('profiles')).json(),[]);
+  await stop();await launch({SM75_SINGLE_CONTAINER:'1',SM75_DEFAULT_PROFILE:'two',MODEL:path.join(root,'model')});
+  assert.deepEqual(await(await call('profiles')).json(),[]);
+  assert.equal((await(await call('settings')).json()).runtimeEnvironment.state,'deleted');
+  assert.equal((await call('profiles',p('two'))).status,200);
+  assert.equal((await(await call('profiles')).json())[0].id,'two');
+  await stop();await launch({SM75_SINGLE_CONTAINER:'1',SM75_DEFAULT_PROFILE:'two',MODEL:path.join(root,'model')});
+  assert.equal((await(await call('settings')).json()).runtimeEnvironment.state,'applied');
+  assert.equal((await(await call('settings')).json()).autoStart,false);
+});

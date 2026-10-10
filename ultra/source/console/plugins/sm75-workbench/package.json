@@ -1,6 +1,6 @@
 {
   "name": "sm75-workbench",
-  "version": "0.1.7-beta",
+  "version": "0.1.7-beta2",
   "type": "module",
   "main": "lib/index.js",
   "exports": {

@@ -58,6 +58,10 @@ def resolve(argv, env):
     return {'id':'docker-startup','name':'Docker 启动参数','format':'custom','args':argv,'env':{}}
 
 def main():
+    if os.environ.get('SM75_BENCHLOCAL_ROLE'):
+        import runpy
+        runpy.run_path(str(Path(__file__).with_name('benchlocal-entrypoint.py')), run_name='__main__')
+        return
     env=dict(os.environ); edition=env.get('SM75_EDITION','standard')
     if edition=='ultra':env.setdefault('SM75_CONSOLE_ROOT','/data')
     supplied=bool(sys.argv[1:] or env.get('SM75_PROFILE'))
@@ -85,6 +89,10 @@ def main():
     for key,value in data['env'].items():env.setdefault(key,str(value))
     if env.get('LMCACHE_ENABLED','').lower() in ('1','true','yes','on'):
         os.execvpe('/opt/vllm-sm75/lmcache-entrypoint.sh',['lmcache-entrypoint.sh',*args],env)
+    import runpy
+    cpu = runpy.run_path(str(Path(__file__).with_name('cpu-kv-check.py')))
+    args = cpu['apply_cpu_environment'](args, env)
+    cpu['check'](args, {})
     if env.get('POWER_MODE')=='pstate':
         for field,key in [('idleSeconds','PSTATE_IDLE_TIMEOUT'),('gpus','PSTATE_GPUS')]:
             if field in data.get('power',{}):env.setdefault(key,str(data['power'][field]))

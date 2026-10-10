@@ -230,7 +230,7 @@ RUN curl -fsSL -o /usr/local/bin/nvidia-pstated \
 
 ENV SM75_FA2_SMALLQ_GRAPH=1 SM75_GDN_B1_METADATA=1
 
-LABEL ai.vllm.sm75.modes="base,mtp,dflash2"
+LABEL ai.vllm.sm75.modes="base,mtp,dflash2,dspark"
 
 # Optional LMCache MP: explicit build/runtime opt-in, same contract as Ultra.
 ARG INSTALL_LMCACHE=0
@@ -243,7 +243,7 @@ RUN chmod +x /opt/vllm-sm75/lmcache-entrypoint.sh && \
     elif [ "$INSTALL_LMCACHE" != 0 ]; then echo 'INSTALL_LMCACHE must be 0 or 1' >&2; exit 2; fi
 
 COPY ultra/source/profiles /opt/vllm-sm75/profiles
-COPY docker/helpers/runtime-entrypoint.py /opt/vllm-sm75/runtime-entrypoint.py
+COPY docker/helpers/runtime-entrypoint.py docker/helpers/cpu-kv-check.py docker/helpers/benchlocal-entrypoint.py /opt/vllm-sm75/
 ENV SM75_EDITION=standard
 ENTRYPOINT ["python3", "/opt/vllm-sm75/runtime-entrypoint.py"]
 CMD []

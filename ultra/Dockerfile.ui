@@ -2,7 +2,7 @@ ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 ARG SOURCE_REVISION=working-tree
 ARG SOURCE_SHA256
-ARG RELEASE_VERSION=0.1.7-beta
+ARG RELEASE_VERSION=0.1.7-beta2
 LABEL org.opencontainers.image.title="VLLM-SM75 Ultra" \
       org.opencontainers.image.version="${RELEASE_VERSION}" \
       org.opencontainers.image.revision="${SOURCE_REVISION}" \
@@ -12,7 +12,8 @@ LABEL org.opencontainers.image.title="VLLM-SM75 Ultra" \
       io.sm75.ui.entry="unified-workbench" \
       io.sm75.release.channel="beta"
 ENV NCCL_P2P_LEVEL=SYS
-RUN node -e 'const fs=require("fs"); if(process.version!=="v22.23.2" || JSON.parse(fs.readFileSync("/opt/harness/node_modules/@deepseek-ai/dsh/package.json")).version!=="0.1.7-alpha.2") throw Error("Use the audited v0.1.6 Ultra runtime");'
+RUN test -f /opt/sm75-workbench/benchlocal-verifiers/runtime-lock.json && test -f /opt/sm75-workbench/benchlocal-native/catalog.json
+RUN node -e 'const fs=require("fs"); if(process.version!=="v22.23.2" || JSON.parse(fs.readFileSync("/opt/harness/node_modules/@deepseek-ai/dsh/package.json")).version!=="0.1.7-alpha.2") throw Error("Use the audited beta2 single-image Ultra runtime");'
 COPY source/console /tmp/sm75-console
 RUN rm -rf /opt/sm75-workbench/console \
     && mv /tmp/sm75-console /opt/sm75-workbench/console \

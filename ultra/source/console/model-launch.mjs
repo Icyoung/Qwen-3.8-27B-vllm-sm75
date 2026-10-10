@@ -4,6 +4,29 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {argValue, setArg, retargetContextModel} from './public/context-config.js';
 
+
+// Profile references are authoritative. Directory scans and older registrations
+// must not silently turn an explicitly configured draft into a main model.
+export function profileModelRoles(profiles) {
+  const roles = new Map();
+  const actual = value => { try { return typeof value === 'string' ? fs.realpathSync(value) : null; } catch { return null; } };
+  for (const profile of profiles) {
+    const model = actual(profile.args?.[0]);
+    if (model) roles.set(model, 'main');
+  }
+  for (const profile of profiles) {
+    try {
+      const spec = JSON.parse(argValue(profile.args || [], '--speculative-config', '{}'));
+      const draft = actual(spec.model);
+      if (draft && roles.get(draft) !== 'main') roles.set(draft, 'draft');
+    } catch {}
+  }
+  return roles;
+}
+export function catalogModelRole(actualPath, referencedRoles, existingRole, scannedRole = 'main') {
+  return referencedRoles.get(actualPath) || (existingRole === 'main' ? 'main' : scannedRole);
+}
+
 export function modelFormat(config) {
   const q = config.quantization_config || config.text_config?.quantization_config || {};
   const method = String(q.quant_method || '').toLowerCase();
@@ -93,11 +116,19 @@ export function preflightModel(profile, {cards = [], requireWeights = true} = {}
   const raw = argValue(profile.args,'--speculative-config');
   if (raw) {
     const spec = JSON.parse(raw);
-    if (spec.method === 'dflash') {
-      if (!spec.model || !fs.existsSync(path.join(spec.model,'config.json'))) throw Error('请先选择已下载的匹配 DFlash2 草稿');
+    if (['dflash','dspark'].includes(spec.method)) {
+      if (!spec.model || !fs.existsSync(path.join(spec.model,'config.json'))) throw Error('请先选择已下载的匹配 '+(spec.method==='dspark'?'DSpark':'DFlash2')+' 草稿');
+      if (!path.isAbsolute(spec.model)) throw Error('草稿必须是已下载的本地绝对路径');
       const draft = JSON.parse(fs.readFileSync(path.join(spec.model,'config.json'),'utf8'));
+      if (spec.method === 'dspark') {
+        if (!Number.isSafeInteger(spec.num_speculative_tokens) || spec.num_speculative_tokens < 1) throw Error('DSpark 投机 tokens 必须是正整数');
+        if (spec.draft_tensor_parallel_size !== undefined && (!Number.isSafeInteger(spec.draft_tensor_parallel_size) || spec.draft_tensor_parallel_size < 1)) throw Error('草稿 TP 卡数必须是正整数');
+        if (cards.length && spec.draft_tensor_parallel_size > cards.length) throw Error('草稿 TP 卡数超过当前可用 GPU 数量');
+        if (spec.enable_adaptive_verification !== undefined && typeof spec.enable_adaptive_verification !== 'boolean') throw Error('DSpark 自适应验证必须为布尔值');
+      }
       const targetVocab = config.text_config?.vocab_size ?? config.vocab_size;
-      if (targetVocab && draft.vocab_size && targetVocab !== draft.vocab_size) throw Error('草稿与主模型词表大小不匹配');
+      const draftVocab = draft.text_config?.vocab_size ?? draft.vocab_size;
+      if (targetVocab && draftVocab && targetVocab !== draftVocab) throw Error('草稿与主模型词表大小不匹配');
     }
   }
   return {ok:true,model:dir,tp};

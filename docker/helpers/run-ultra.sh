@@ -3,8 +3,8 @@
 set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 VERSION="$(tr -d ' \r\n' < "$SCRIPT_DIR/VERSION")"
-ULTRA_VERSION="${VERSION%-beta}-ultra-beta"
-[[ "$VERSION" == *-beta ]] || ULTRA_VERSION="$VERSION-ultra"
+ULTRA_VERSION="${VERSION/-beta/-ultra-beta}"
+[[ "$VERSION" == *-beta* ]] || ULTRA_VERSION="$VERSION-ultra"
 : "${ULTRA_DATA_ROOT:?Set ULTRA_DATA_ROOT to an absolute persistent host directory}"
 : "${MODEL_ROOT:?Set MODEL_ROOT to your existing absolute model directory}"
 [[ "$ULTRA_DATA_ROOT" == /* && "$ULTRA_DATA_ROOT" != / && "$MODEL_ROOT" == /* && -d "$MODEL_ROOT" ]] || {
@@ -34,10 +34,16 @@ while IFS= read -r setting || [[ -n "$setting" ]]; do
   [[ -n "$setting" && "$setting" != \#* ]] || continue
   if [[ -v "$setting" ]]; then runtime_env+=(--env "$setting"); fi
 done < "$SCRIPT_DIR/helpers/runtime-env.list"
+# The three CPU roles reuse this exact image. Credentials stay in a local file.
+if [[ "${BENCHLOCAL:-1}" == 1 ]]; then
+  export IMAGE="${IMAGE:-vllm-sm75:v${ULTRA_VERSION}}"
+  bash "$SCRIPT_DIR/benchlocal.sh" start
+  extra+=(--env-file "${BENCHLOCAL_ENV_FILE:-$ULTRA_DATA_ROOT/benchlocal.env}")
+fi
 # Existing data is neither migrated nor recursively chowned by this launcher.
 # The manager creates its own files; DSH drops to UID/GID 1000 itself.
-exec docker run --detach --name "${CONTAINER_NAME:-vllm-sm75-ultra}" \
-  --gpus "${GPUS:-all}" --shm-size 16g --ulimit nofile=1048576:1048576 \
+docker run --detach --name "${CONTAINER_NAME:-vllm-sm75-ultra}" \
+  --gpus "${GPUS:-all}" --shm-size "${SHM_SIZE:-32g}" --ulimit nofile=1048576:1048576 \
   --cap-drop ALL --cap-add CHOWN --cap-add FOWNER --cap-add DAC_OVERRIDE \
   --cap-add SETUID --cap-add SETGID --cap-add KILL --security-opt no-new-privileges \
   --publish "${CONSOLE_PORT:-1615}:1615" --publish "${PORT:-8000}:8000" \
@@ -48,3 +54,5 @@ exec docker run --detach --name "${CONTAINER_NAME:-vllm-sm75-ultra}" \
   --volume "$ULTRA_DATA_ROOT/home:/dsh/home" --volume "$ULTRA_DATA_ROOT/workspace:/dsh/workspace" \
   --volume "$MODEL_ROOT:/models:ro" "${extra[@]}" \
   "${IMAGE:-vllm-sm75:v${ULTRA_VERSION}}"
+
+if [[ "${BENCHLOCAL:-1}" == 1 ]]; then bash "$SCRIPT_DIR/benchlocal.sh" connect; fi

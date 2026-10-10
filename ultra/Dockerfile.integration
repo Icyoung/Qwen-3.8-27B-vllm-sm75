@@ -1,7 +1,7 @@
 # The application layer comes from the reviewed source; only pinned Node and
 # Harness dependencies are reused from the audited Ultra dependency image.
-ARG HARNESS_IMAGE=vllm-sm75:v0.1.7-ultra-beta
-ARG VLLM_IMAGE=vllm-sm75:v0.1.7-ultra-beta
+ARG HARNESS_IMAGE=vllm-sm75:v0.1.7-ultra-beta2
+ARG VLLM_IMAGE=vllm-sm75:v0.1.7-ultra-beta2
 FROM ${HARNESS_IMAGE} AS harness
 FROM ${VLLM_IMAGE}
 ARG SOURCE_SHA256

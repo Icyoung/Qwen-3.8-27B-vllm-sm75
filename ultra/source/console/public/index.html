@@ -7,7 +7,7 @@
   ><link rel="icon" href="/brand/favicon.svg" /><link
     rel="manifest"
     href="/brand/manifest.webmanifest"
-  /><script src="/appearance-bootstrap.js"></script><link rel="stylesheet" href="/style.css" />
+  /><script src="/appearance-bootstrap.js"></script><link rel="stylesheet" href="/style.css?v=profile-actions-20261009" />
   <body>
     <aside id="consoleSidebar" hidden>
       <h2 class="brand">
@@ -266,7 +266,8 @@
                 <select id="variant" hidden>
                   <option value="base">普通</option>
                   <option value="mtp">MTP</option>
-                  <option value="dflash">DFLASH2</option></select
+                  <option value="dflash">DFLASH2</option>
+                  <option value="dspark">DSpark</option></select
                 ><button id="chooseMtp" type="button" hidden>MTP</button
                 ><button id="chooseDflash" type="button" hidden>DFLASH2</button
                 ><button id="setAcceleration" type="button" hidden>
@@ -279,7 +280,7 @@
             </div>
           </section>
           <details class="editor-section editor-fold" id="quickConfiguration">
-            <summary>快速组合与投机解码<span>场景模板、卡数、KV 精度和 DFlash2 / MTP</span></summary>
+            <summary>快速组合与投机解码<span>场景模板、卡数、KV 精度和 DSpark / DFlash2 / MTP</span></summary>
             <div class="section-body">
             <div class="template-load editor-row"><label>场景模板<select id="templateSelect"></select></label><button id="applyTemplate">载入模板</button></div>
             <div class="editor-row combo-row">
@@ -319,6 +320,7 @@
                   <option value="none">无</option>
                   <option value="mtp">MTP</option>
                   <option value="dflash">DFlash2</option>
+                  <option value="dspark">DSpark</option>
                 </select></label
               ><label hidden
                 >CPU KV<select id="comboCpuKv">
@@ -409,8 +411,8 @@
             <div id="lmcacheFields" hidden>
               <div class="editor-row two-columns">
                 <label>CPU 缓存总容量（GiB）<input id="lmcacheCpuGiB" aria-label="LMCache CPU 缓存总容量（GiB）" type="number" min="0" step="any" value="8" /></label>
-                <label>缓存块大小（tokens）<input id="lmcacheChunkSize" aria-label="LMCache chunk size" type="number" min="1" step="1" placeholder="按运行日志填写" /></label>
-                <label class="full-width">磁盘缓存目录<input id="lmcacheDiskPath" aria-label="LMCache 磁盘缓存目录" placeholder="留空：仅使用 CPU 缓存" /></label>
+                <label>缓存块大小（tokens，留空自动）<input id="lmcacheChunkSize" aria-label="LMCache chunk size" aria-describedby="lmcacheChunkHint" type="number" min="1" step="1" placeholder="自动识别" /><span class="help" id="lmcacheChunkHint" role="status" aria-live="polite"></span></label>
+                <label class="full-width">磁盘缓存目录（容器内，可选）<span class="lmcache-path-row"><input id="lmcacheDiskPath" aria-label="LMCache 磁盘缓存目录" aria-describedby="lmcacheDiskHint" placeholder="/data/cache/lmcache/disk" /><button id="lmcacheUseDiskDefault" type="button">使用推荐目录</button></span><span class="help" id="lmcacheDiskHint">留空仅使用 CPU；推荐 /data/cache/lmcache/disk，启动时自动创建。</span></label>
               </div>
               <details class="inline-details"><summary>磁盘与服务设置</summary><div class="editor-row two-columns">
                 <label class="full-width">启动所需磁盘剩余空间（GiB）<input id="lmcacheMinFreeDiskGiB" aria-label="LMCache 启动所需剩余空间（GiB）" type="number" min="0" step="any" value="4" /></label>
@@ -418,9 +420,9 @@
                 <label>HTTP 端口<input id="lmcacheHttpPort" aria-label="LMCache HTTP 端口" type="number" min="1024" max="65535" step="1" value="5556" /></label>
               </div></details>
               <details class="editor-help"><summary>LMCache 使用说明</summary>
-                <p class="help">LMCache 0.5.5 提供 CPU 与磁盘分层缓存。缓存块大小须为运行日志中的块大小或其整数倍，更换模型或 TP 后重新核对。</p>
+                <p class="help">LMCache 0.5.5 提供 CPU 与磁盘分层缓存。块大小按当前配置的真实运行记录自动识别，无需翻日志；更换模型、TP、KV 精度或投机参数后会重新识别。</p>
                 <p class="help">磁盘目录使用 Linux 绝对路径。“剩余空间”只做启动检查，用量上限由卷配额控制。启动时会检查依赖和缓存服务。</p>
-                <p class="help">需要安装 LMCache 扩展并使用 P-State，暂不支持 DFlash / MTP。选择此方案会替代原生 CPU KV，自定义连接器与草稿配置需手动处理。</p>
+                <p class="help">需要安装 LMCache 扩展并使用 P-State，暂不支持 DSpark / DFlash / MTP。选择此方案会替代原生 CPU KV，自定义连接器与草稿配置需手动处理。</p>
               </details>
             </div>
             <p class="help cache-status" id="lmcacheStatus" role="status" aria-live="polite" style="white-space: pre-line"></p>
@@ -676,7 +678,12 @@
       <section id="tests" hidden>
         <div id="monitorTestView">
           <section id="benchmarks">
-            <article class="benchmark-project">
+            <nav id="benchmarkProjectTabs" class="benchmark-project-tabs" role="tablist" aria-label="模型测试项目">
+              <button type="button" role="tab" data-benchmark-project="speedtest" aria-controls="benchProject-speedtest" aria-selected="false">吞吐测试</button>
+              <button type="button" role="tab" data-benchmark-project="sql" aria-controls="benchProject-sql" aria-selected="false">SQL 测试</button>
+              <button type="button" role="tab" data-benchmark-project="benchlocal" aria-controls="benchLocalProject" aria-selected="true">能力评测 · BenchLocal</button>
+            </nav>
+            <article class="benchmark-project" id="benchProject-speedtest" hidden>
               <div class="benchmark-heading">
                 <span>性能测试 · llm_speedtest</span
                 ><input
@@ -693,7 +700,7 @@
                 hidden
               ></iframe>
             </article>
-            <article class="benchmark-project">
+            <article class="benchmark-project" id="benchProject-sql" hidden>
               <div class="benchmark-heading">
                 <span>SQL 测试 · SQL LLM Benchmark</span
                 ><input
@@ -709,6 +716,44 @@
                 title="SQL 测试 · SQL LLM Benchmark"
                 hidden
               ></iframe>
+            </article>
+            <article class="benchmark-project" id="benchLocalProject">
+              <div class="benchmark-heading"><span>能力评测 · BenchLocal</span><input type="checkbox" role="switch" id="benchToggle-benchlocal" aria-label="启用能力评测 · BenchLocal" checked /></div>
+              <div id="benchLocalPanel" class="benchlocal-panel">
+                <p id="blCurrentModel" class="muted"></p>
+                <div class="benchlocal-controls bl-primary-controls">
+                  <label>参数方案<select id="blPreset"><option value="default">题包默认</option><option value="custom">自定义</option></select></label>
+                  <label>思考模式<select id="blThinking"><option value="default">跟随题包</option><option value="off">关闭</option><option value="on">开启</option></select></label>
+                  <label>思考深度<select id="blEffort"><option value="default">默认</option><option value="low">低 · 1,024 tokens</option><option value="medium">中 · 4,096 tokens</option><option value="high">高 · 16,384 tokens</option><option value="custom">自定义预算</option></select></label>
+                  <label>温度<input id="blTemperature" data-bl-param="temperature" type="number" min="0" max="2" step="0.1" placeholder="跟随题包" /></label>
+                  <label>最大生成 Token<input id="blMaxTokens" data-bl-param="max_tokens" type="number" min="1" max="1048576" step="1" placeholder="跟随题包（包含思考）" /></label>
+                  <label>思考预算 Token<input id="blThinkingBudget" type="number" min="1" max="1048575" step="1" placeholder="跟随题包" disabled /></label>
+                  <label>请求超时（秒）<input id="blRequestTimeout" data-bl-param="request_timeout_seconds" type="number" min="5" max="1800" step="1" value="300" placeholder="默认 300" /></label>
+                </div>
+                <details class="bl-advanced"><summary>高级采样与参数方案</summary><div class="benchlocal-controls">
+                  <label>Top P<input data-bl-param="top_p" type="number" min="0.000001" max="1" step="any" placeholder="跟随题包" /></label>
+                  <label>Top K<input data-bl-param="top_k" type="number" min="-1" max="1000000" step="1" placeholder="跟随题包，-1 不限制" /></label>
+                  <label>Min P<input data-bl-param="min_p" type="number" min="0" max="1" step="any" placeholder="跟随题包" /></label>
+                  <label>重复惩罚<input data-bl-param="repetition_penalty" type="number" min="0.000001" max="3" step="any" placeholder="跟随题包" /></label>
+                  <label>存在惩罚<input data-bl-param="presence_penalty" type="number" min="-2" max="2" step="any" placeholder="跟随题包" /></label>
+                  <label>频率惩罚<input data-bl-param="frequency_penalty" type="number" min="-2" max="2" step="any" placeholder="跟随题包" /></label>
+                  <label>Seed<input data-bl-param="seed" type="number" min="-2147483648" max="2147483647" step="1" placeholder="跟随题包" /></label>
+                  <label>方案名称<input id="blPresetName" maxlength="100" placeholder="例如：中思考 · 温度0.6" /></label>
+                </div><div class="benchlocal-actions"><button id="blSavePreset">保存参数方案</button><span id="blParameterNote" class="muted">参数只用于本次评测。</span></div></details>
+                <div class="benchlocal-actions"><button id="blSelectSix">默认6项</button><button id="blSelectAll">全部9项</button><button id="blSelectNone">清空</button><span id="blSelectionCount" class="muted"></span><button id="blRun" class="primary">开始评测</button><button id="blStop" disabled>停止</button></div>
+                <div id="blCategories" class="bl-categories" aria-label="全部九类能力测试"></div>
+                <p id="blStatus" role="status"></p>
+                <div class="benchlocal-history"><label>测试记录<select id="blHistory"><option value="">暂无记录</option></select></label><label>对照一<select id="blCompare"><option value="">不作对照</option></select></label><label>对照二<select id="blCompareTwo"><option value="">不作对照</option></select></label></div>
+                <div class="benchlocal-actions"><button id="blImport">导入报告</button><input id="blImportFiles" type="file" accept="application/json,.json" multiple hidden /><select id="blExportFormat" aria-label="导出格式"><option value="json">标准 JSON</option><option value="detailed">详细 JSON</option><option value="csv">CSV 逐题表</option></select><button id="blDownload" disabled>导出结果</button><button id="blReplay" disabled>按相同方案测试当前模型</button></div>
+                <div class="benchlocal-result-heading bl-result-width"><span id="blResultTitle">选择类目后开始评测</span><span id="blScore"></span></div>
+                <div id="blProgressRow" class="bl-progress-row bl-result-width" hidden><progress id="blProgress" max="1" value="0" hidden></progress><span id="blProgressText" class="muted" aria-live="polite"></span></div><p id="blError" role="alert" hidden></p>
+                <div id="blComparisonNote" class="muted bl-result-width"></div>
+                <div class="bl-overview bl-result-width"><div id="blRadarWrap"><svg id="blRadar" role="img" aria-label="能力雷达图，范围0至100分"></svg></div><table id="blScores" class="bl-score-table" aria-label="项目得分对照"></table><div id="blRadarLegend" class="bl-radar-legend"></div></div>
+                <div class="benchlocal-result-heading bl-result-width"><span>完整测试结果 · 每排20题</span><span id="blReportParameters" class="muted"></span></div>
+                <div id="blMatrixScroll" class="bl-matrix-scroll"><table id="blMatrix" class="bl-matrix" aria-label="当前模型全部项目及逐题结果"></table></div>
+                <p class="bl-outcome-legend muted"><span data-result="pass">通过</span><span data-result="partial">部分得分</span><span data-result="fail">未通过</span><span data-result="error">执行异常</span><span data-result="running">测试中</span><span data-result="missing">未测</span></p>
+                <section id="blDetail" class="bl-detail" hidden><div class="benchlocal-result-heading"><span id="blDetailTitle"></span><button id="blCloseDetail">收起详情</button></div><div id="blDetailContent"></div></section>
+              </div>
             </article>
           </section>
         </div>
@@ -907,6 +952,6 @@
         <pre id="logs"></pre>
       </dialog>
     </main>
-    <script type="module" src="/app.js"></script>
+    <script type="module" src="/app.js?v=profile-actions-20261009"></script>
   </body>
 </html>

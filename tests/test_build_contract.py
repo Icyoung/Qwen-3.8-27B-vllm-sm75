@@ -77,7 +77,7 @@ class BuildContract(unittest.TestCase):
             package = Path(tmp) / 'site-packages/vllm'
             evidence = Path(tmp) / 'evidence/speculative-files.json'
             result = install(ROOT / 'docker/speculative', package, evidence)
-            self.assertEqual(len(result), 9)
+            self.assertEqual(len(result), 10)
             self.assertTrue(evidence.is_file())
             self.assertTrue((package.parent / 'sm75_fa2_graph.py').is_file())
 
@@ -94,7 +94,7 @@ class BuildContract(unittest.TestCase):
         self.assertEqual(re.findall(r'^FROM .* AS (.*)$', text, re.M)[-1], 'final')
         self.assertIn('python3 /tmp/install_speculative.py', text)
         launch = (ROOT / 'docker/run.sh').read_text(encoding='utf-8')
-        self.assertIn('image="vllm-sm75:v${VERSION}"', launch)
+        self.assertIn('image="vllm-sm75:v${VERSION/-beta/-ultra-beta}"', launch)
         self.assertIn('"$SCRIPT_DIR/VERSION"', launch)
         self.assertNotIn('image+=', launch)
 

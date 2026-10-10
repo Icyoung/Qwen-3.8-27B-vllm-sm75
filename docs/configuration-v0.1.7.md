@@ -1,8 +1,8 @@
 # v0.1.7 模型配置与启动
 
-v0.1.7 使用同一套推理实现运行 Qwen3.8 27B 和 Flash Next。标准镜像提供推理 API 与引擎监控，Ultra 增加完整管理面板。模型权重、推理参数、量化、MTP/DFlash2 和工具解析支持共用。
+v0.1.7 使用同一套推理实现运行 Qwen3.8 27B 和 Flash Next。标准镜像提供推理 API 与引擎监控，Ultra 增加完整管理面板。模型权重、推理参数、量化、MTP/DFlash2/DSpark 和工具解析支持共用。
 
-对应 `v0.1.7-beta` 预发布源码；版本摘要见[发布说明](releases/v0.1.7-beta.md)，测试结果见[性能更新](flash-next-performance.md)与[整合验收](validation/v0.1.7-unified.md)。
+对应 `v0.1.7-beta2` 预发布源码；版本摘要见[发布说明](releases/v0.1.7-beta2.md)，测试结果见[性能更新](flash-next-performance.md)与[整合验收](validation/v0.1.7-unified.md)。
 
 ## 模型模板
 
@@ -10,6 +10,8 @@ v0.1.7 使用同一套推理实现运行 Qwen3.8 27B 和 Flash Next。标准镜�
 
 | 模板 ID | 模型 | 主要参数 |
 |---|---|---|
+| `qwen38-27b-fp8-dspark5` | 27B FP8＋DSpark | TP4、k5、FP8 KV、256K、seq4、batch2048 |
+| `qwen38-27b-nvfp4-dspark5-256k` | 27B NVFP4＋DSpark | TP4、k5、FP8 KV、256K、seq4、每卡 GPU KV 5 GiB |
 | `qwen38-27b-fp8` | 27B FP8 | TP4、seq4、batch8192、FP8 KV |
 | `qwen38-27b-fp8-mtp5` | 27B FP8＋MTP | 同上，MTP5、capture[6] |
 | `qwen38-27b-fp8-dflash2` | 27B FP8＋DFlash2 | draft7、TP4、capture[8] |
@@ -56,7 +58,7 @@ docker run -d --name vllm-sm75-ultra \
   -v "$DATA_ROOT/cache:/data/cache" -v "$DATA_ROOT/home:/dsh/home" \
   -v "$DATA_ROOT/workspace:/dsh/workspace" \
   -v "$NVAPI_LIB:/usr/local/nvidia/lib64/libnvidia-api.so.1:ro" \
-  vllm-sm75:v0.1.7-ultra-beta \
+  vllm-sm75:v0.1.7-ultra-beta2 \
   /models/Qwen3.8-Flash-Next-W4A16-FP8PLE \
   --served-model-name Flash-Next-TP8 \
   --dtype float16 --hf-overrides '{"dtype":"float16"}' \
@@ -77,7 +79,7 @@ docker run -d --name vllm-sm75-ultra \
 
 Ultra 自动启动1615面板，并把命令中的模型参数作为可编辑的运行配置。管理页在 `http://<服务器IP>:1615`；API地址为 `http://<服务器IP>:8000/v1`。已登录管理员可在设置或“API 地址 / Key”中查看、复制Key。
 
-标准运行使用同一组模型参数和内核环境变量，继续使用 `vllm-sm75:v0.1.7-ultra-beta`，增加 `-e SM75_EDITION=standard`，保留8000端口及模型/缓存挂载；1615、`/dsh/home`和`/dsh/workspace`用于Ultra。标准运行的编译缓存可持久挂载到 `/root/.cache`，电源管理可通过 `POWER_MODE=pstate` 和既有 P-State 参数启用。
+标准运行使用同一组模型参数和内核环境变量，继续使用 `vllm-sm75:v0.1.7-ultra-beta2`，增加 `-e SM75_EDITION=standard`，保留8000端口及模型/缓存挂载；1615、`/dsh/home`和`/dsh/workspace`用于Ultra。标准运行的编译缓存可持久挂载到 `/root/.cache`，电源管理可通过 `POWER_MODE=pstate` 和既有 P-State 参数启用。
 
 也可在镜像后使用 `--profile flash-next-tp8-256k-mtp3`；用 `MODEL`、`DRAFT_MODEL`指定容器内权重目录，后续明确传入的CLI参数覆盖模板的对应选项。Ultra面板中选择该模型，再选同名模板并载入，得到相同推理参数。模板中的离线和Next内核设置只应用到模型进程。
 
@@ -124,3 +126,29 @@ python3 tools/benchmark_v017.py --label next-check --cases 4k,8k --repeats 3 --o
 ```
 
 对照必须使用同一模型、配置和输入；脚本会核对usage、token IDs、请求计数、缓存命中和抢占。该脚本的Decode首末token计时与控制台完整流阶段口径分别记录，不能直接混为一个指标。
+
+## 27B DSpark 与 CPU KV
+
+```bash
+export ULTRA_DATA_ROOT=/srv/vllm-sm75/ultra
+export MODEL_ROOT=/srv/models
+export SM75_PROFILE=qwen38-27b-fp8-dspark5
+export MODEL=/models/Qwen3.8-27B-FP8
+export DRAFT_MODEL=/models/Qwen3.8-27B-DSpark
+export CPU_KV_GIB=16 SHM_SIZE=32g
+EDITION=ultra bash docker/run.sh
+```
+
+NVFP4 改用 `qwen38-27b-nvfp4-dspark5-256k` 模板和对应 `MODEL` 路径。主模型 KV 为 FP8，草稿 KV 为 auto；模板关闭自适应验证。`CPU_KV_GIB` 为整组 TP 合计，`SHM_SIZE` 必须为 CPU KV 和进程通信保留空间。
+
+仅 API 运行可以直接使用同一个 Ultra 镜像：
+
+```bash
+docker run -d --name vllm-sm75-api --gpus all --shm-size 32g \
+  -p 8000:8000 -e SM75_EDITION=standard -e SM75_PROFILE \
+  -e MODEL -e DRAFT_MODEL -e CPU_KV_GIB=16 -e VLLM_API_KEY \
+  -v "$MODEL_ROOT:/models:ro" \
+  vllm-sm75:v0.1.7-ultra-beta2
+```
+
+P-State 设置、NVAPI 挂载和原有参数见前面的电源及启动说明。BenchLocal 单镜像部署见 [模型测试](benchlocal.md)。

@@ -1,3 +1,11 @@
+# Ultra v0.1.7 beta2
+
+统一镜像为 `vllm-sm75:v0.1.7-ultra-beta2`，包含全部 BenchLocal 依赖。使用 `EDITION=ultra bash docker/build.sh` 完整构建，不再单独构建执行镜像。
+
+[当前构建与启动](../README.md#5-快速构建与启动) · [参数模板](../docs/configuration-v0.1.7.md) · [BenchLocal](../docs/benchlocal.md)
+
+---
+
 # vLLM-SM75 v0.1.7 beta Ultra
 
 本版更新模型选择、配置编辑、模型切换及工作台会话恢复，详见 [v0.1.7 beta](../docs/releases/v0.1.7-beta.md)。
