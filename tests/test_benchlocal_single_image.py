@@ -7,31 +7,27 @@ class SingleImage(unittest.TestCase):
   spec=importlib.util.spec_from_file_location('recipe',ROOT/'tools/generate_ultra_dockerfile.py');m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
   self.assertEqual((ROOT/'docker/Dockerfile.ultra-full').read_text(),m.render())
   self.assertNotIn('local/sm75-benchlocal-',m.render())
- @unittest.skipUnless(shutil.which('bash'),'Bash required')
- def test_workers_use_one_image_and_no_gpu_or_host_mounts(self):
-  with tempfile.TemporaryDirectory() as directory:
-   d=Path(directory);log=d/'calls.jsonl';fake=d/'docker'
-   fake.write_text('''#!/usr/bin/env python3
-import json,os,sys
-args=sys.argv[1:]
-with open(os.environ['CALLS'],'a') as f:f.write(json.dumps(args)+'\\n')
-if args[:2]==['image','inspect']:print('1' if 'io.sm75.benchlocal.unified' in ' '.join(args) else 'sha256:fixture');sys.exit(0)
-if args[:2] in [['container','inspect'],['network','inspect']]:sys.exit(1)
-sys.exit(0)
-''');fake.chmod(0o755)
-   env={**os.environ,'PATH':str(d)+os.pathsep+os.environ['PATH'],'CALLS':str(log),'ULTRA_DATA_ROOT':str(d/'state'),'IMAGE':'fixture/ultra:beta2'}
-   p=subprocess.run(['bash',str(ROOT/'docker/benchlocal.sh'),'start'],env=env,text=True,capture_output=True)
-   self.assertEqual(p.returncode,0,p.stderr)
-   calls=[json.loads(x) for x in log.read_text().splitlines()];runs=[x for x in calls if x[:1]==['run']]
-   self.assertEqual(len(runs),3)
-   for args in runs:
-    self.assertIn('fixture/ultra:beta2',args);self.assertNotIn('--gpus',args);self.assertNotIn('--volume',args)
-    self.assertEqual(args[args.index('--runtime')+1],'runc');self.assertEqual(args[args.index('--memory')+1],'4g')
-    self.assertIn('--read-only',args);self.assertIn('NVIDIA_VISIBLE_DEVICES=void',args)
-   self.assertFalse(any(x[:1] in [['pull'],['build']] for x in calls))
-   key=d/'state/benchlocal.env';self.assertRegex(key.read_text(),r'^SM75_BENCH_VERIFIER_KEY=[0-9a-f]{64}\n$')
-   self.assertEqual(key.stat().st_mode & 0o777,0o600)
-   self.assertNotIn(key.read_text().strip().split('=',1)[1],p.stdout+p.stderr)
+ @unittest.skipUnless(os.name=='posix' and shutil.which('bash'),'Linux Bash required')
+ def test_host_socket_path_is_bound_to_a_valid_controller_name(self):
+  env={**os.environ,'CONTAINER_NAME':'fixture-ultra'}
+  r=subprocess.run(['bash',str(ROOT/'docker/benchlocal.sh'),'path'],env=env,text=True,capture_output=True)
+  self.assertEqual(r.returncode,0,r.stderr)
+  import hashlib
+  expected='/run/sm75-benchlocal/'+hashlib.sha256(b'fixture-ultra').hexdigest()[:24]+'/control'
+  self.assertEqual(r.stdout.strip(),expected)
+  for name in ['../escape','x/../../host','name;docker run anything','']:
+   bad={**env,'CONTAINER_NAME':name}
+   if not name:continue
+   r=subprocess.run(['bash',str(ROOT/'docker/benchlocal.sh'),'path'],env=bad,text=True,capture_output=True)
+   self.assertNotEqual(r.returncode,0)
+ def test_execution_profile_has_the_documented_narrow_extension(self):
+  root=ROOT/'ultra/source/benchlocal-verifiers'
+  meta=json.loads((root/'browser-seccomp-source.json').read_text())
+  profile=json.loads((root/'browser-seccomp.json').read_text())
+  self.assertEqual(set(meta['additionalCalls']),{'clone','setns','unshare','chroot'})
+  self.assertEqual(profile['defaultAction'],'SCMP_ACT_ERRNO')
+  import hashlib
+  self.assertEqual(hashlib.sha256((root/'browser-seccomp.json').read_bytes()).hexdigest(),meta['outputSha256'])
  def test_runtime_payload_has_all_three_roles(self):
   root=ROOT/'ultra/source/benchlocal-verifiers'
   for role in ['bugfind-15','cli-40','hermesagent-20']:

@@ -34,7 +34,9 @@ class SelectedPagesRunner:
     single-request prefill only, not mixed batches or speculative verification.
     Keep this object across layers. K/V views stay on their original storage.
     """
-    def __init__(self, device, disable_split_kv=True):
+    def __init__(self, device, disable_split_kv=True, num_query_heads=3):
+        assert num_query_heads in (3,6)
+        self.num_query_heads=num_query_heads
         from flashinfer import BatchPrefillWithPagedKVCacheWrapper
         self.device = torch.device(device)
         self.workspace = torch.empty(256,
@@ -84,7 +86,7 @@ class SelectedPagesRunner:
             cpu_indptr,
             self.pages[:total_pages],
             (counts - 1) % 4 + 1,
-            3, 1, 256, 4)
+            self.num_query_heads, 1, 256, 4)
         plan_options = dict(causal=False, use_fp16_qk_reduction=False,
                             q_data_type=torch.float16, kv_data_type=torch.float16,
                             o_data_type=torch.float16,
@@ -116,7 +118,7 @@ class SelectedPagesRunner:
 
     def run(self, q, k, v, indices, table, seq, gate, out):
         assert q.dtype == k.dtype == v.dtype == torch.float16
-        assert q.shape[1:] == (3, 256) and k.shape[2:] == (1, 256)
+        assert q.shape[1:] == (self.num_query_heads, 256) and k.shape[2:] == (1, 256)
         assert q.is_contiguous() and out.is_contiguous() and gate.is_contiguous()
         assert indices.shape == (q.shape[0], 2052)
         assert indices.dtype == table.dtype == torch.int32
@@ -149,10 +151,10 @@ def run(q, k, v, indices, table, seq, gate, out):
     """Execute the unchanged selected token sets with bounded query chunks."""
     device = q.device
     stream = torch.cuda.current_stream(device)
-    key = (device.index, stream.cuda_stream)
+    key = (device.index, stream.cuda_stream, q.shape[1])
     runner = _RUNNERS.get(key)
     if runner is None:
-        runner = SelectedPagesRunner(device)
+        runner = SelectedPagesRunner(device, num_query_heads=q.shape[1])
         _RUNNERS[key] = runner
     rows = q.shape[0]
     for first in range(0, rows, 1024):
@@ -182,6 +184,6 @@ def warmup():
         indices[:, 2048+lane] = torch.where(
             tails > lane, ((positions + 1)//4)*4 + lane, -1)
     indices[:, -1] = 2048 + tails
-    runner = SelectedPagesRunner(device)
+    runner = SelectedPagesRunner(device, num_query_heads=q.shape[1])
     runner.run(q, k, v, indices, table, seq, gate, out)
     torch.cuda.synchronize(device)

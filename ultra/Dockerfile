@@ -18,8 +18,8 @@ RUN ln -sf /opt/harness/node_modules/pnpm/bin/pnpm.mjs /usr/local/bin/pnpm \
     && pnpm --version
 COPY source /opt/sm75-workbench
 RUN python3 /opt/sm75-workbench/benchlocal-verifiers/install-runtime.py
-LABEL io.sm75.benchlocal.unified="1"
-ARG INSTALL_LMCACHE=0
+LABEL io.sm75.benchlocal.unified="1" io.sm75.benchlocal.execution="ondemand-v1"
+ARG INSTALL_LMCACHE=1
 RUN if [ "${INSTALL_LMCACHE}" = "1" ]; then python3 /opt/sm75-workbench/lmcache/install.py --install --build-no-gpu; fi
 COPY overlay/font-scale.py /opt/vllm-sm75/font-scale.py
 RUN python3 /opt/vllm-sm75/font-scale.py \

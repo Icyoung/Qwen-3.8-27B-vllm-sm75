@@ -244,6 +244,8 @@ RUN chmod +x /opt/vllm-sm75/lmcache-entrypoint.sh && \
 
 COPY ultra/source/profiles /opt/vllm-sm75/profiles
 COPY docker/helpers/runtime-entrypoint.py docker/helpers/cpu-kv-check.py docker/helpers/benchlocal-entrypoint.py /opt/vllm-sm75/
+COPY docker/benchlocal.sh /opt/vllm-sm75/benchlocal-host/benchlocal.sh
+COPY docker/helpers/benchlocal-service.sh /opt/vllm-sm75/benchlocal-host/helpers/benchlocal-service.sh
 ENV SM75_EDITION=standard
 ENTRYPOINT ["python3", "/opt/vllm-sm75/runtime-entrypoint.py"]
 CMD []

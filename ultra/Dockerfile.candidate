@@ -9,7 +9,7 @@ RUN npm ci --omit=dev --no-audit --no-fund
 
 FROM ${BASE_IMAGE}
 ENV NCCL_P2P_LEVEL=SYS
-RUN test -f /opt/sm75-workbench/benchlocal-verifiers/runtime-lock.json && test -f /opt/sm75-workbench/benchlocal-native/catalog.json
+RUN test -x /opt/sm75-workbench/benchlocal-verifiers/host-broker && test -f /opt/sm75-workbench/benchlocal-native/catalog.json
 ARG SOURCE_REVISION=working-tree
 ARG SOURCE_SHA256
 ARG RELEASE_VERSION=0.1.7-beta2
@@ -27,6 +27,8 @@ RUN ln -sf /opt/harness/node_modules/pnpm/bin/pnpm.mjs /usr/local/bin/pnpm \
 COPY overlay/font-scale.py /opt/vllm-sm75/font-scale.py
 RUN rm -rf /opt/sm75-workbench/console
 COPY source /opt/sm75-workbench
+RUN python3 /opt/sm75-workbench/benchlocal-verifiers/install-runtime.py
+LABEL io.sm75.benchlocal.execution="ondemand-v1"
 ARG INSTALL_LMCACHE=0
 RUN if [ "${INSTALL_LMCACHE}" = "1" ]; then python3 /opt/sm75-workbench/lmcache/install.py --install; fi
 RUN python3 /opt/vllm-sm75/font-scale.py \

@@ -1,4 +1,4 @@
-import {mountBenchLocal} from './benchlocal-native-ui.js';
+import {mountBenchLocal} from './benchlocal-native-ui.js?v=benchlocal-aligned-20261010';
 import {mountApiAccess} from './api-access-ui.js';
 
 // Shared by the legacy form and the quick combination editor. Keep imported

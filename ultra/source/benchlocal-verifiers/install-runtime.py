@@ -22,14 +22,28 @@ def verify_versions(assets):
   actual=subprocess.check_output([program,*args],text=True).strip()
   if expected not in actual:raise RuntimeError('Unexpected dependency version: '+program)
  return True
+def install_execution_components():
+ with tempfile.TemporaryDirectory(prefix='sm75-broker-build-') as cache:
+  env={**os.environ,'CGO_ENABLED':'0','GOMAXPROCS':'2','GOCACHE':cache}
+  run('/usr/local/go/bin/go','build','-trimpath','-ldflags=-s -w','-o',str(HERE/'host-broker'),str(HERE/'host-broker.go'),env=env)
+ (HERE/'host-broker').chmod(0o755)
+ browser=TOOLS/'chrome/chrome-linux64/chrome'
+ wrapper=HERE/'chromium-sandbox.sh';wrapper.chmod(0o755)
+ alias=Path('/usr/bin/chromium')
+ if alias.is_symlink() and alias.resolve()==browser.resolve():alias.unlink()
+ if alias.exists() and alias.resolve()!=wrapper.resolve():raise RuntimeError('Unexpected system Chromium; verify the pinned browser alias')
+ if not alias.exists():alias.symlink_to(wrapper)
+
 def install():
  if os.uname().machine!='x86_64':raise RuntimeError('The SM75 Ultra image targets Linux x86_64')
  assets=json.loads((HERE/'assets.lock.json').read_text())
- identity={'schema':1,'assets':assets,'hermesCommit':COMMIT,'pythonLockSha256':hashlib.sha256((HERE/'hermes-requirements.lock').read_bytes()).hexdigest()}
+ identity={'schema':3,'execution':'ondemand-v1','assets':assets,'hermesCommit':COMMIT,'pythonLockSha256':hashlib.sha256((HERE/'hermes-requirements.lock').read_bytes()).hexdigest()}
  marker=HERE/'runtime-lock.json'
- if marker.is_file() and json.loads(marker.read_text())==identity:
-  verify_versions(assets)
-  print('BenchLocal execution dependencies already installed');return
+ if marker.is_file():
+  previous=json.loads(marker.read_text())
+  if all(previous.get(key)==identity[key] for key in ['assets','hermesCommit','pythonLockSha256']):
+   verify_versions(assets);install_execution_components();marker.write_text(json.dumps(identity,indent=2)+'\n')
+   print('BenchLocal execution dependencies verified; on-demand launcher updated');return
  TOOLS.mkdir(parents=True,exist_ok=True)
  env={**os.environ,'DEBIAN_FRONTEND':'noninteractive'}
  packages=['ca-certificates','git','gawk','jq','vim-common','python3-venv','python3-pytest','build-essential','xz-utils','unzip',
@@ -91,6 +105,7 @@ def install():
  run('/usr/local/go/bin/go','version');run(str(TOOLS/'rust/bin/rustc'),'--version');run('agent-browser','--version')
  run(str(TOOLS/'chrome/chrome-linux64/chrome'),'--version')
  verify_versions(assets)
+ install_execution_components()
  marker.write_text(json.dumps(identity,indent=2)+'\n')
  run('apt-get','clean')
  lists=Path('/var/lib/apt/lists')

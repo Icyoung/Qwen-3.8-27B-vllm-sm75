@@ -246,6 +246,8 @@ RUN chmod +x /opt/vllm-sm75/lmcache-entrypoint.sh && \
 
 COPY ultra/source/profiles /opt/vllm-sm75/profiles
 COPY docker/helpers/runtime-entrypoint.py docker/helpers/cpu-kv-check.py docker/helpers/benchlocal-entrypoint.py /opt/vllm-sm75/
+COPY docker/benchlocal.sh /opt/vllm-sm75/benchlocal-host/benchlocal.sh
+COPY docker/helpers/benchlocal-service.sh /opt/vllm-sm75/benchlocal-host/helpers/benchlocal-service.sh
 ENV SM75_EDITION=standard
 ENTRYPOINT ["python3", "/opt/vllm-sm75/runtime-entrypoint.py"]
 CMD []
@@ -268,8 +270,8 @@ RUN ln -sf /opt/harness/node_modules/pnpm/bin/pnpm.mjs /usr/local/bin/pnpm \
     && pnpm --version
 COPY ultra/source /opt/sm75-workbench
 RUN python3 /opt/sm75-workbench/benchlocal-verifiers/install-runtime.py
-LABEL io.sm75.benchlocal.unified="1"
-ARG INSTALL_LMCACHE=0
+LABEL io.sm75.benchlocal.unified="1" io.sm75.benchlocal.execution="ondemand-v1"
+ARG INSTALL_LMCACHE=1
 RUN if [ "${INSTALL_LMCACHE}" = "1" ]; then python3 /opt/sm75-workbench/lmcache/install.py --install --build-no-gpu; fi
 COPY ultra/overlay/font-scale.py /opt/vllm-sm75/font-scale.py
 RUN python3 /opt/vllm-sm75/font-scale.py \

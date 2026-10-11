@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from typing import ClassVar
 
+import os
 import torch
 import torch.nn.functional as F
 from torch import nn
@@ -695,7 +696,8 @@ class Qwen4ExpNGramEmbedding(nn.Module):
         embedding_quant_method = Qwen4ExpPLEEmbeddingMethod.from_quant_config(
             quant_config,
             embedding_prefix,
-            getattr(config, "ple_embedding_dtype", None),
+            ("float8_e4m3fn" if os.environ.get("TP4_NEXT_RUNTIME") == "1"
+             and os.environ.get("SM75_PLE_STORE") else getattr(config, "ple_embedding_dtype", None)),
         )
         if params_dtype is None:
             params_dtype = torch.get_default_dtype()
@@ -705,6 +707,10 @@ class Qwen4ExpNGramEmbedding(nn.Module):
             if engram_config is not None and engram_config.cpu_offload
             else Qwen4ExpPLEDeviceEmbedding
         )
+        # Four-card deployments keep the complete PLE table in the verified NVMe store.
+        if os.environ.get("TP4_NEXT_RUNTIME") == "1" and os.environ.get("SM75_PLE_STORE"):
+            from ple_runtime import DiskPLEEmbedding
+            embedding_cls = DiskPLEEmbedding
         self.ngram_embedding = embedding_cls(
             padded_vocab_size,
             self.head_dim,
@@ -920,6 +926,11 @@ class Qwen4ExpNGramEmbedding(nn.Module):
                         f"expected {expected_shape}, got "
                         f"{tuple(loaded_weight.shape)}"
                     )
+                if getattr(embedding, "is_disk_ple", False):
+                    if loaded_weight.dtype != torch.float8_e4m3fn:
+                        raise ValueError("Disk PLE store requires FP8 checkpoint shards")
+                    loaded.add("ngram_embedding.weight")
+                    continue
                 embedding.weight.weight_loader(
                     embedding.weight,
                     loaded_weight,

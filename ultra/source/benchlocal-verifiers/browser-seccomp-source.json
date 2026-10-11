@@ -1,0 +1,16 @@
+{
+  "module": "github.com/moby/profiles/seccomp",
+  "version": "v0.2.3",
+  "url": "https://github.com/moby/profiles/blob/seccomp/v0.2.3/seccomp/default.json",
+  "gitBlob": "ea5a494afb8d64898fa0f4f47ae0c4f5ba9cbbc9",
+  "sha256": "536529b665dd0972c37bfb569f5d4ac8a53592e7b00752bc39ff063ca9864c74",
+  "additionalCalls": [
+    "chroot",
+    "clone",
+    "setns",
+    "unshare"
+  ],
+  "outputSha256": "10b44b20c5ff68403c2ba2d287f400204ab75b2929461edb51f3c2699d5f0750",
+  "scope": "temporary CPU execution containers only; default masked and readonly proc paths retained",
+  "reason": "Chrome needs chroot inside its own user namespace; no SYS_CHROOT capability is added to the execution container"
+}

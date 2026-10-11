@@ -77,6 +77,8 @@ async function main() {
         secrets:[{providerId:provider,value:''}],models:[model],
         inferenceEndpoints:[{modelId:'current',status:'running',baseUrl:job.proxyLocal,dockerBaseUrl:job.proxyDocker,authMode:'bearer',apiKey:'',exposedModel:job.model.id}],
         verifiers:verifier?[{id:'verifier',mode:'managed',status:'running',url:verifier}]:[]};
+      const managed=job.verifierMode==='ondemand'&&['bugfind-15','cli-40','hermesagent-20'].includes(id);
+      if(managed){const response=await globalThis.fetch(verifier+'/prepare',{method:'POST',signal:abort.signal});if(!response.ok){let value;try{value=await response.json();}catch{}throw Error(value?.error||'执行环境准备失败');}}
       const session=await pack.prepare(context),results=[];
       const libraryGeneration={request_timeout_seconds:DEFAULT_REQUEST_TIMEOUT_SECONDS,...meta.samplingDefaults,...job.options.generation};
       // Hermes uses the OpenAI SDK, which rejects vendor-only top-level kwargs.
@@ -109,7 +111,7 @@ async function main() {
         const complete=results.length===meta.scenarioCount&&results.every(x=>x.status!=='cancelled'&&Number.isFinite(x.score));
         const summary=complete?await pack.scoreModelResults(results):null;
         await emit({kind:'suite-result',packId:id,summary,complete});
-      } finally {await session.dispose?.();}
+      } finally {await session.dispose?.();if(managed){const response=await globalThis.fetch(verifier+'/release',{method:'POST',signal:AbortSignal.timeout(20000)});if(!response.ok)throw Error('执行环境未正常回收');}}
     }
     await emit({kind:'finished',cancelled:abort.signal.aborted});
   } finally {

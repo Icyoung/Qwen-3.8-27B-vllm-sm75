@@ -13,9 +13,9 @@ const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../benc
 const runtime=process.env.SM75_BENCHLOCAL_RUNTIME||root;
 const catalog=JSON.parse(fs.readFileSync(path.join(runtime,'catalog.json'),'utf8'));
 const caps={toggle:true,budget:true};
-test('native catalog preserves all scenario IDs and the 90/165 presets',()=>{
+test('native catalog preserves all scenario IDs and the 95/165 presets',()=>{
   assert.equal(catalog.packs.length,9);
-  assert.equal(catalog.packs.filter(x=>x.defaultSelected).reduce((n,x)=>n+x.scenarioCount,0),90);
+  assert.equal(catalog.packs.filter(x=>x.defaultSelected).reduce((n,x)=>n+x.scenarioCount,0),95);
   assert.equal(catalog.packs.reduce((n,x)=>n+x.scenarioCount,0),165);
   for(const p of catalog.packs)assert.equal(new Set(p.scenarios.map(x=>x.id)).size,p.scenarioCount);
 });
@@ -30,7 +30,7 @@ test('sampling preserves explicit zero, meaningful defaults and thinking constra
   assert.equal(payload.temperature,0);assert.equal(payload.thinking_token_budget,4096);
   assert.deepEqual(payload.tools,[{name:'fixture'}]);assert.equal(payload.chat_template_kwargs.enable_thinking,true);
 });
-test('native worker, model proxy, batch scoring and report round-trip use real pinned pack code',async t=>{
+test('six inline packs: native worker, model proxy, batch scoring and report round-trip use real pinned pack code',async t=>{
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'sm75-bench-native-'));
   const secret='private-test-api-key-not-for-export';
   const requests=[];
@@ -44,7 +44,7 @@ test('native worker, model proxy, batch scoring and report round-trip use real p
   manager.proxyLocal='http://127.0.0.1:'+gateway.address().port+'/benchlocal-inference/v1';
   manager.proxyDocker=manager.proxyLocal;
   t.after(async()=>{manager.close();gateway.closeAllConnections();model.closeAllConnections();await Promise.all([new Promise(r=>gateway.close(r)),new Promise(r=>model.close(r))]);assert.equal(path.dirname(path.resolve(directory)),path.resolve(os.tmpdir()));assert.ok(path.basename(directory).startsWith('sm75-bench-native-'));fs.rmSync(directory,{recursive:true,force:true});});
-  const row=await manager.start({packIds:catalog.packs.filter(p=>p.defaultSelected).map(p=>p.id),options:{temperature:.4,max_tokens:4096,thinking:'off'}},
+  const row=await manager.start({packIds:catalog.packs.filter(p=>p.verifier!=='managed').map(p=>p.id),options:{temperature:.4,max_tokens:4096,thinking:'off'}},
     {model:'fixture-model',modelName:'FixtureModel',profileName:'Fixture',url:'http://127.0.0.1:'+model.address().port,engineKey:secret,capabilities:caps,isCurrent:()=>true});
   const child=manager.active.child;await once(child,'close');
   const report=manager.detail(row.id);

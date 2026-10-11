@@ -1,3 +1,4 @@
+import {consumeStoppedModelGuard} from './maintenance-start.mjs';
 import { BenchLocal } from './benchlocal-native.mjs';
 import {deleteRuntimeProfile,deletedBootProfile,persistProfiles} from './profile-delete.mjs';
 import {thinkingCapabilities,normalizeOptions,digest} from './benchlocal-contract.mjs';
@@ -1557,7 +1558,8 @@ const server = http.createServer(async (req, res) => {
 // Import Docker settings once before listening. Later edits in the panel are
 // authoritative until the next manager start; never reapply env per launch.
 let runtimeImportError = null;
-if (standalone && (hasRuntimeOverrides(process.env) || process.env.SM75_LAUNCH_PROFILE)) {
+const preserveStoppedModel=consumeStoppedModelGuard(root);
+if (!preserveStoppedModel && standalone && (hasRuntimeOverrides(process.env) || process.env.SM75_LAUNCH_PROFILE)) {
   try {
     const settings = store.settings();
     const boot = process.env.SM75_LAUNCH_PROFILE ? JSON.parse(process.env.SM75_LAUNCH_PROFILE) : null;
@@ -1599,11 +1601,12 @@ if (standalone && (hasRuntimeOverrides(process.env) || process.env.SM75_LAUNCH_P
   }
 }
 server.listen(port, host, async () => {
+  void benchLocal.readiness(true).catch(error=>console.warn('评测启动检查暂未完成：',error.message));
   console.log(
     `SM75 console http://${host}:${port}; login token file: ${secretPath}`,
   );
   const settings = store.settings();
-  if (settings.autoStart && !runtimeImportError)
+  if (settings.autoStart && !runtimeImportError && !preserveStoppedModel)
     try {
       await start(profile(settings.defaultProfile));
       store.put("startup", "last", {

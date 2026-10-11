@@ -41,7 +41,7 @@ def run(q,k,v,indices,table,seq,gate,out,*,k_scale=None,v_scale=None):
     from flashinfer import single_prefill_with_kv_cache
     assert q.dtype==torch.float16 and k.dtype==v.dtype
     assert k.dtype in (torch.float16,torch.uint8)
-    assert q.shape[1:]==(3,256) and k.shape[2:]==(1,256)
+    assert q.shape[1] in (3,6) and q.shape[2]==256 and k.shape[2:]==(1,256)
     assert 0<seq<=16384 and q.shape[0]>=128
     assert gate.is_contiguous() and out.is_contiguous()
     pages=table[0,:triton.cdiv(seq,k.shape[1])].long()

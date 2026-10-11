@@ -34,11 +34,11 @@ while IFS= read -r setting || [[ -n "$setting" ]]; do
   [[ -n "$setting" && "$setting" != \#* ]] || continue
   if [[ -v "$setting" ]]; then runtime_env+=(--env "$setting"); fi
 done < "$SCRIPT_DIR/helpers/runtime-env.list"
-# The three CPU roles reuse this exact image. Credentials stay in a local file.
+# The host service only starts fixed, CPU-only jobs from the same pinned image.
 if [[ "${BENCHLOCAL:-1}" == 1 ]]; then
-  export IMAGE="${IMAGE:-vllm-sm75:v${ULTRA_VERSION}}"
-  bash "$SCRIPT_DIR/benchlocal.sh" start
-  extra+=(--env-file "${BENCHLOCAL_ENV_FILE:-$ULTRA_DATA_ROOT/benchlocal.env}")
+  IMAGE="${IMAGE:-vllm-sm75:v${ULTRA_VERSION}}" CONTAINER_NAME="${CONTAINER_NAME:-vllm-sm75-ultra}" bash "$SCRIPT_DIR/benchlocal.sh" install
+  broker_dir=$(CONTAINER_NAME="${CONTAINER_NAME:-vllm-sm75-ultra}" bash "$SCRIPT_DIR/benchlocal.sh" path)
+  extra+=(--volume "$broker_dir:/run/sm75-benchlocal:ro" --env SM75_BENCH_BROKER_SOCKET=/run/sm75-benchlocal/control.sock)
 fi
 # Existing data is neither migrated nor recursively chowned by this launcher.
 # The manager creates its own files; DSH drops to UID/GID 1000 itself.
@@ -54,5 +54,3 @@ docker run --detach --name "${CONTAINER_NAME:-vllm-sm75-ultra}" \
   --volume "$ULTRA_DATA_ROOT/home:/dsh/home" --volume "$ULTRA_DATA_ROOT/workspace:/dsh/workspace" \
   --volume "$MODEL_ROOT:/models:ro" "${extra[@]}" \
   "${IMAGE:-vllm-sm75:v${ULTRA_VERSION}}"
-
-if [[ "${BENCHLOCAL:-1}" == 1 ]]; then bash "$SCRIPT_DIR/benchlocal.sh" connect; fi

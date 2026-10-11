@@ -202,7 +202,8 @@ class Qwen4ExpQSAFlashAttentionImpl(FlashAttentionImpl):
         # its exact selection (including causal tail), FP16 output rounding,
         # and FP32 sigmoid gate. All untested shapes use the sparse fallback.
         if (current_platform.is_device_capability(75) and use_prefill_config
-                and num_tokens >= 128 and query.shape[1:] == (3, 256)
+                and num_tokens >= 128 and (query.shape[1:] == (3, 256) or
+                    (os.environ.get("TP4_NEXT_RUNTIME") == "1" and query.shape[1:] == (6, 256)))
                 and key_cache.shape[2:] == (1, 256)
                 and attn_metadata.query_start_loc.numel() == 2
                 and 0 < attn_metadata.max_seq_len <= 16384
@@ -218,7 +219,8 @@ class Qwen4ExpQSAFlashAttentionImpl(FlashAttentionImpl):
         # The <=16K optimized path above remains unchanged; decode/mixed batches
         # retain the sparse fallback below; FP8 uses explicit software decode.
         if (current_platform.is_device_capability(75) and use_prefill_config
-                and num_tokens >= 128 and query.shape[1:] == (3, 256)
+                and num_tokens >= 128 and (query.shape[1:] == (3, 256) or
+                    (os.environ.get("TP4_NEXT_RUNTIME") == "1" and query.shape[1:] == (6, 256)))
                 and key_cache.shape[2:] == (1, 256)
                 and attn_metadata.query_start_loc.numel() == 2
                 and 16384 < attn_metadata.max_seq_len <= 262144

@@ -5,20 +5,24 @@ import os from 'node:os';
 import {fork} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {BenchLocalProxy} from './benchlocal-proxy.mjs';
+import {OnDemandVerifiers,EXECUTION_ROLES} from './benchlocal-ondemand.mjs';
 import {REPORT_KIND,PROTOCOL,UUID,TERMINAL,normalizeOptions,portableReport,validateImportedReport,redactBenchLocal,digest,reportCsv,restorePackScores} from './benchlocal-contract.mjs';
 
 const here=path.dirname(fileURLToPath(import.meta.url));
-const defaultVerifiers={'bugfind-15':'http://sm75-bench-bugfind:4200','cli-40':'http://sm75-bench-cli:4200','hermesagent-20':'http://sm75-bench-hermes:4200'};
+
 export class BenchLocal {
   constructor(root,{runtime=process.env.SM75_BENCHLOCAL_RUNTIME||path.join(here,'../benchlocal-native'),
     forkProcess=fork,worker=path.join(here,'benchlocal-native-worker.mjs'),verifiers,verifierKey,
     proxyLocal,proxyDocker,fetchImpl=fetch}={}) {
     this.root=path.join(root,'benchlocal');this.runtime=path.resolve(runtime);this.worker=worker;this.forkProcess=forkProcess;
-    this.verifiers=verifiers||JSON.parse(process.env.SM75_BENCH_VERIFIERS||JSON.stringify(defaultVerifiers));
-    this.verifierKey=verifierKey??process.env.SM75_BENCH_VERIFIER_KEY??'';
+    this.verifiers=verifiers||{};
+    this.verifierKey=verifierKey??'';
     this.proxyLocal=proxyLocal||'http://127.0.0.1:'+(process.env.SM75_CONSOLE_PORT||1615)+'/benchlocal-inference/v1';
     this.proxyDocker=proxyDocker||process.env.SM75_BENCH_PROXY_BASE||'http://sm75-bench-controller:1615/benchlocal-inference/v1';
     this.fetch=fetchImpl;this.proxy=new BenchLocalProxy({fetchImpl});this.active=null;this.records=new Map();this.healthCache=null;
+    this.execution=verifiers===undefined?new OnDemandVerifiers({proxyHandler:(req,res)=>this.proxy.handle(req,res),onFailure:reason=>this.active?.row?this.cancel(this.active.id,reason):undefined}):null;
+    this.cleanupPromise=Promise.resolve();
+    if(this.execution){this.verifierKey=this.execution.key;this.verifiers=Object.fromEntries(EXECUTION_ROLES.map(id=>[id,'internal']));this.proxyDocker='http://127.0.0.1:1615/benchlocal-inference/v1';}
     fs.mkdirSync(path.join(this.root,'jobs'),{recursive:true,mode:0o700});this.own(this.root);this.own(path.join(this.root,'jobs'));
     for(const id of fs.readdirSync(path.join(this.root,'jobs'))) {
       if(!UUID.test(id))continue;
@@ -39,6 +43,7 @@ export class BenchLocal {
   list(){return [...this.records.values()].sort((a,b)=>b.created-a.created).slice(0,100).map(row=>({...row,events:undefined,suites:row.suites.map(({results,scenarios,...suite})=>({...suite,done:results?.length||0}))}));}
   detail(id){const row=this.records.get(id);if(!row)throw Error('评测记录不存在');return row;}
   async readiness(force=false){
+    if(this.execution)return this.execution.readiness(force);
     if(!force&&this.healthCache&&Date.now()-this.healthCache.at<15000)return this.healthCache.states;
     const states={};
     await Promise.all(Object.entries(this.verifiers).map(async([id,url])=>{
@@ -70,6 +75,7 @@ export class BenchLocal {
     fs.mkdirSync(this.file(row.id,''),{mode:0o700});this.own(this.file(row.id,''));this.records.set(row.id,row);this.persist(row);return row;
   }
   async start(body,context){
+    await this.cleanupPromise;
     if(this.busy)throw Error('已有BenchLocal评测正在运行');
     if(body.packId!==undefined)throw Error('评测界面已更新，请刷新页面后重试');
     const catalog=this.catalog();let selection=body.packIds??catalog.packs.filter(x=>x.defaultSelected).map(x=>x.id);
@@ -98,6 +104,7 @@ export class BenchLocal {
     }
     const active={id:crypto.randomUUID(),context,cancelled:false,audit:new Map(),tokens:[],child:null};this.active=active;
     try {
+      if(this.execution){await this.execution.activate(selection,active.id);this.verifiers={...Object.fromEntries(EXECUTION_ROLES.map(id=>[id,'internal'])),...this.execution.endpoints};}
       const readiness=await this.readiness(true);
       for(const id of selection)if(this.verifiers[id]&&!readiness[id]?.ready)throw Error(catalog.packs.find(x=>x.id===id).label+'：'+(readiness[id]?.reason||'验证环境不可用'));
       if(active.cancelled)throw Error('评测已取消');
@@ -111,7 +118,7 @@ export class BenchLocal {
       active.row=row;
       const dir=this.file(row.id,'');fs.mkdirSync(dir,{mode:0o700});this.own(dir);
       this.records.set(row.id,row);this.persist(row);
-      const input={id:row.id,fixtureId,selection,scenarioSelection,model:row.model,options,verifiers:this.verifiers,proxyLocal:this.proxyLocal,proxyDocker:this.proxyDocker};
+      const input={id:row.id,fixtureId,selection,scenarioSelection,model:row.model,options,verifiers:Object.fromEntries(Object.entries(this.verifiers).filter(([id])=>selection.includes(id))),verifierMode:this.execution?'ondemand':'external',proxyLocal:this.proxyLocal,proxyDocker:this.proxyDocker};
       const privateInput=this.file(row.id,'input.json');fs.writeFileSync(privateInput,JSON.stringify(input),{mode:0o600});this.own(privateInput);
       active.tempDir=fs.mkdtempSync(path.join(os.tmpdir(),'sm75-bench-worker-'+row.id+'-'));this.own(active.tempDir);
       const inputFile=path.join(active.tempDir,'input.json');fs.writeFileSync(inputFile,JSON.stringify(input),{mode:0o600});this.own(inputFile);
@@ -134,9 +141,10 @@ export class BenchLocal {
         row.completed ||= Date.now();for(const suite of row.suites)if(['pending','running'].includes(suite.state))suite.state=active.cancelled?'cancelled':'interrupted';
         this.persist(row);if(this.active===active)this.active=null;
         this.cleanupWorker(active);
+        if(this.execution)this.cleanupPromise=this.execution.release();
       });
       return row;
-    }catch(error){if(active.row){active.row.state='failed';active.row.error=error.message;this.persist(active.row);}if(this.active===active)this.active=null;this.cleanupWorker(active);throw error;}
+    }catch(error){if(active.row){active.row.state='failed';active.row.error=error.message;this.persist(active.row);}if(this.active===active)this.active=null;this.cleanupWorker(active);if(this.execution)await this.execution.release();throw error;}
   }
   cleanupWorker(active){
     if(!active.tempDir)return;
@@ -186,9 +194,10 @@ export class BenchLocal {
     if(active.row){active.row.state='cancelling';active.row.error=reason;this.persist(active.row);}
     active.child?.kill('SIGTERM');
     const selection=active.row?.selection||[];
-    await Promise.all(selection.filter(id=>this.verifiers[id]).map(async id=>{try{await this.fetch(this.verifiers[id]+'/cancel',{method:'POST',headers:{Authorization:'Bearer '+this.verifierKey},signal:AbortSignal.timeout(3000)});}catch{}}));
+    if(this.execution)await this.execution.release();
+    else await Promise.all(selection.filter(id=>this.verifiers[id]).map(async id=>{try{await this.fetch(this.verifiers[id]+'/cancel',{method:'POST',headers:{Authorization:'Bearer '+this.verifierKey},signal:AbortSignal.timeout(3000)});}catch{}}));
     if(active.child){active.force=setTimeout(()=>active.child.kill('SIGKILL'),10000);active.force.unref();}
     return active.row||{id,state:'cancelled'};
   }
-  close(){if(this.active)void this.cancel(this.active.id,'服务停止，测试已取消');}
+  async close(){if(this.active)await this.cancel(this.active.id,'服务停止，测试已取消');await this.cleanupPromise;if(this.execution)await this.execution.close();}
 }

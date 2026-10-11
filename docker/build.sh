@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # 鏋勫缓姝ｅ紡闀滃儚 vllm-sm75:v$(cat docker/VERSION)
 set -euo pipefail
+if [[ "${BUILD_MODE:-full}" == preserve ]]; then
+    exec bash "$(dirname -- "${BASH_SOURCE[0]}")/build-preserved.sh"
+fi
 # Production Unraid has previously stalled while exporting full image layers.
 # Temporary guard for the unisolated exporter that caused the incident.
 # Full builds are allowed once resource isolation/export/recovery are validated.
@@ -14,6 +17,7 @@ VERSION="$(tr -d ' \r\n' < "$ROOT/docker/VERSION")"
 ULTRA_VERSION="${VERSION/-beta/-ultra-beta}"
 [[ "$VERSION" == *-beta* ]] || ULTRA_VERSION="$VERSION-ultra"
 EDITION="${EDITION:-ultra}"
+if [[ "$EDITION" == ultra ]]; then INSTALL_LMCACHE=${INSTALL_LMCACHE:-1}; fi
 BUILD_MODE="${BUILD_MODE:-full}"
 case "$EDITION:$BUILD_MODE" in standard:full|standard:fast|ultra:full|ultra:ui) ;;
     *) echo 'Use EDITION=standard|ultra; BUILD_MODE=full, standard fast, or ultra ui' >&2; exit 2;; esac

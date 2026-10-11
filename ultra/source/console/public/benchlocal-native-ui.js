@@ -1,6 +1,14 @@
 const states={pending:'待测试',running:'正在测试',cancelling:'正在停止',completed:'已完成',cancelled:'已取消',failed:'存在执行错误',interrupted:'已中断',partial:'部分复测'};
 const results={pass:'通过',partial:'部分得分',fail:'未通过',error:'执行异常',cancelled:'已取消',running:'正在测试',missing:'未测'};
 const defaultRequestTimeout=300;
+const legacyDefaultPacks=['toolcall-15','dataextract-15','instructfollow-15','promptauthority-15','reasonmath-15','structoutput-15'];
+export function restoreBenchLocalSelection(packs,saved){
+  const defaults=packs.filter(p=>p.defaultSelected).map(p=>p.id);
+  if(!Array.isArray(saved?.selected)||saved.selectionPreset==='default')return defaults;
+  const ids=packs.filter(p=>saved.selected.includes(p.id)).map(p=>p.id);
+  const legacy=saved.selectionPreset===undefined&&ids.length===legacyDefaultPacks.length&&legacyDefaultPacks.every(id=>ids.includes(id));
+  return legacy?defaults:ids;
+}
 export const packSuiteScore=suite=>Number.isFinite(suite?.score)?suite.score:Number.isFinite(suite?.summary?.totalScore)?suite.summary.totalScore:null;
 export function packResultScore(result){
   if(result?.status==='cancelled')return null;
@@ -55,7 +63,7 @@ export function mountBenchLocal({api,run}) {
     const saved=data?.presets.find(x=>x.name===value.presetName);
     $('blPreset').value=saved?'saved:'+saved.name:fields.some(input=>input.dataset.blParam!=='request_timeout_seconds'&&input.value!=='')||Number($('blRequestTimeout').value)!==defaultRequestTimeout||$('blThinking').value!=='default'?'custom':'default';paintThinking();
   }
-  function remember(){try{localStorage.setItem('sm75-benchlocal-native-preferences',JSON.stringify({selected:[...selected],options:readOptions()}));}catch{}}
+  function remember(){try{localStorage.setItem('sm75-benchlocal-native-preferences',JSON.stringify({selected:[...selected],selectionPreset:selected.size===6&&data.packs.filter(p=>p.defaultSelected).every(p=>selected.has(p.id))?'default':'custom',options:readOptions()}));}catch{}}
   function paintThinking(){
     const cap=data?.currentModel?.capabilities||{},on=$('blThinking').value==='on';
     $('blThinking').disabled=!cap.toggle;
@@ -82,8 +90,8 @@ export function mountBenchLocal({api,run}) {
     const signature=JSON.stringify(data.packs.map(x=>[x.id,x.sourceDigest,data.readiness?.[x.id]]));
     if(signature!==catalogSignature){catalogSignature=signature;const cards=[];
       for(const pack of data.packs){
-        const label=node('label',undefined,{class:'bl-category'}),head=node('span',undefined,{class:'bl-category-head'}),check=node('input',undefined,{type:'checkbox','data-pack':pack.id,'aria-label':pack.label});
-        head.append(check,node('span',pack.label),node('small',pack.scenarioCount+'题'));label.append(head,node('small',pack.name,{class:'muted'}),node('span',pack.description,{class:'bl-description'}));
+        const label=node('label',undefined,{class:'bl-category',title:pack.name}),head=node('span',undefined,{class:'bl-category-head'}),check=node('input',undefined,{type:'checkbox','data-pack':pack.id,'aria-label':pack.label});
+        head.append(check,node('span',pack.label),node('small',pack.name,{class:'bl-pack-name'}),node('small',pack.scenarioCount+'题'));label.append(head,node('span',pack.description,{class:'bl-description'}));
         if(data.readiness?.[pack.id]&&!data.readiness[pack.id].ready)label.append(node('small',data.readiness[pack.id].reason,{class:'bl-unavailable'}));
         check.onchange=()=>{check.checked?selected.add(pack.id):selected.delete(pack.id);paintSelection();remember();if(!record)renderResults();};cards.push(label);
       }$('blCategories').replaceChildren(...cards);
@@ -138,15 +146,14 @@ export function mountBenchLocal({api,run}) {
   function findResult(packId,id){return record?.suites.find(x=>x.id===packId)?.results.find(x=>x.scenarioId===id);}
   function renderMatrix(){
     if(!data)return;const scroll=$('blMatrixScroll'),previous=scroll.scrollLeft,table=$('blMatrix');table.replaceChildren();
-    const font=parseFloat(getComputedStyle(root).fontSize)||14,scale=font/16,first=Math.round(160*scale),score=Math.round(56*scale),cellWidth=Math.round(44*scale);
-    const resultWidth=(first+score+cellWidth*20)+'px';
-    root.style.setProperty('--bl-result-width',resultWidth);scroll.style.setProperty('--bl-project-width',first+'px');table.style.width=resultWidth;
-    const cols=node('colgroup');for(const w of[first,score,...Array(20).fill(cellWidth)]){const c=node('col');c.style.width=w+'px';cols.append(c);}table.append(cols);
+    const font=parseFloat(getComputedStyle(root).fontSize)||14,scale=font/16,first=Math.round(160*scale),score=Math.round(56*scale),minimumCaseWidth=Math.ceil(34*scale);
+    scroll.style.setProperty('--bl-project-width',first+'px');table.style.width='100%';table.style.minWidth=(first+score+minimumCaseWidth*20)+'px';
+    const cols=node('colgroup');for(const width of[first,score,...Array(20).fill(null)]){const c=node('col');if(width!==null)c.style.width=width+'px';cols.append(c);}table.append(cols);
     const head=node('thead'),tr=node('tr');tr.append(node('th','测试项目',{class:'bl-project',scope:'col'}),node('th','得分',{class:'bl-score',scope:'col'}),node('th','逐题结果 · 每排20题',{colspan:20,scope:'colgroup'}));head.append(tr);table.append(head);
-    for(const pack of data.packs){const suite=record?.suites.find(x=>x.id===pack.id),chosen=record?record.selection.includes(pack.id):selected.has(pack.id),count=Math.ceil(pack.scenarioCount/20),group=node('tbody',undefined,{'data-suite':pack.id});
+    for(const pack of data.packs){const suite=record?.suites.find(x=>x.id===pack.id),chosen=record?record.selection.includes(pack.id):selected.has(pack.id),count=Math.ceil(pack.scenarioCount/20),group=node('tbody',undefined,{'data-suite':pack.id,class:count>1?'bl-suite bl-suite-multi':'bl-suite'});
       const metas=suite?.scenarios||pack.scenarios;
       for(let line=0;line<count;line++){
-        const row=node('tr');if(line===0){const label=node('th',undefined,{rowspan:count,scope:'rowgroup',class:'bl-project'});label.append(node('span',pack.label),node('small',chosen?(suite?.results.length||0)+'/'+pack.scenarioCount:'未选择'));row.append(label,node('td',number(packSuiteScore(suite)),{rowspan:count,class:'bl-score'}));}
+        const row=node('tr');if(line===0){const label=node('th',undefined,{rowspan:count,scope:'rowgroup',class:'bl-project'});const heading=node('div',undefined,{class:'bl-suite-heading'});heading.append(node('span',pack.label),node('small',chosen?(suite?.results.length||0)+'/'+pack.scenarioCount:'未选择'));label.append(heading);const score=node('td',undefined,{rowspan:count,class:'bl-score'});score.append(node('div',number(packSuiteScore(suite)),{class:'bl-suite-heading'}));row.append(label,score);}
         for(let slot=0;slot<20;slot++){const index=line*20+slot,td=node('td'),meta=metas[index];if(!meta){td.className='bl-empty';row.append(td);continue;}
           const result=findResult(pack.id,meta.id),state=result?.status||(suite?.current===meta.id?'running':'missing'),label=outcomeLabel(result,state);
           const button=node('button',undefined,{type:'button',class:'bl-case','data-result':state,'aria-label':pack.label+' '+meta.id+' '+label,title:meta.id+' · '+label+(Number.isFinite(packResultScore(result))?' · '+number(packResultScore(result))+'分':'')});
@@ -188,7 +195,7 @@ export function mountBenchLocal({api,run}) {
     if(loading||$('tests')?.hidden||$('benchLocalProject').hidden)return;loading=true;
     try{
       data=await api('/console-api/benchlocal');if(loadError){$('blStatus').textContent='';loadError=false;}$('benchToggle-benchlocal').checked=data.enabled;root.hidden=!data.enabled;
-      if(!selectionReady){selected=new Set(data.packs.filter(x=>x.defaultSelected).map(x=>x.id));try{const saved=JSON.parse(localStorage.getItem('sm75-benchlocal-native-preferences')||'null');if(saved){if(Array.isArray(saved.selected))selected=new Set(saved.selected.filter(id=>data.packs.some(x=>x.id===id)));setOptions(saved.options||{});}}catch{}selectionReady=true;}
+      if(!selectionReady){let saved;try{saved=JSON.parse(localStorage.getItem('sm75-benchlocal-native-preferences')||'null');}catch{}selected=new Set(restoreBenchLocalSelection(data.packs,saved));if(saved)setOptions(saved.options||{});selectionReady=true;remember();}
       const ps=JSON.stringify(data.presets);if(ps!==presetSignature){presetSignature=ps;const before=$('blPreset').value;$('blPreset').replaceChildren(node('option','题包默认',{value:'default'}),node('option','自定义',{value:'custom'}),...data.presets.map(x=>node('option',x.name,{value:'saved:'+x.name})));$('blPreset').value=[...$('blPreset').options].some(o=>o.value===before)?before:'custom';}
       $('blCurrentModel').textContent=data.currentModel.running?'当前模型：'+data.currentModel.modelName+' · 名称、API 与凭据自动读取':data.currentModel.loading?'模型正在加载，完成后可以开始评测':'请先在运行配置中启动模型';paintThinking();paintCatalog();
       const view=savedView;savedView=null;

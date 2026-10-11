@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const source = fs.readFileSync(new URL('../public/app.js', import.meta.url), 'utf8')
-  .replace("from './benchlocal-native-ui.js'", 'from ' + JSON.stringify(new URL('../public/benchlocal-native-ui.js', import.meta.url).href))
+  .replace(/from ['"]\.\/benchlocal-native-ui\.js(?:\?[^'"]*)?['"]/, 'from ' + JSON.stringify(new URL('../public/benchlocal-native-ui.js', import.meta.url).href))
   .replace("from './api-access-ui.js'", 'from ' + JSON.stringify(new URL('../public/api-access-ui.js', import.meta.url).href))
   .replace('from "/live-summary.js"', 'from ' + JSON.stringify(new URL('../public/live-summary.js', import.meta.url).href))
   .replace('from "./context-config.js"', 'from ' + JSON.stringify(new URL('../public/context-config.js', import.meta.url).href))

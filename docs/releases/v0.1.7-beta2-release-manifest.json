@@ -15,7 +15,10 @@
     "full": "docker/Dockerfile.ultra-full",
     "existingUltra": "docker/Dockerfile.ultra",
     "outputImages": 1,
-    "benchlocalSeparateImagesRequired": false
+    "benchlocalSeparateImagesRequired": false,
+    "preserved": "docker/Dockerfile.ultra-preserved",
+    "preservedEntry": "docker/build-preserved.sh",
+    "lmcacheIncludedByDefault": true
   },
   "benchlocal": {
     "catalog": "ultra/source/benchlocal-native/catalog.json",
@@ -25,8 +28,18 @@
     "hermesCommit": "ea74f61d983ebdfd6a863c45761d1b38081f1d08",
     "defaultSuites": 6,
     "allSuites": 9,
-    "defaultCases": 90,
-    "allCases": 165
+    "defaultCases": 95,
+    "allCases": 165,
+    "defaultPacks": [
+      "toolcall-15",
+      "dataextract-15",
+      "instructfollow-15",
+      "reasonmath-15",
+      "bugfind-15",
+      "hermesagent-20"
+    ],
+    "execution": "same-image-on-demand",
+    "maxExecutionContainers": 1
   },
   "inferenceModes": [
     "base",
@@ -34,5 +47,11 @@
     "dflash2",
     "dspark"
   ],
-  "standardMode": "SM75_EDITION=standard"
+  "standardMode": "SM75_EDITION=standard",
+  "flashNextTP4": {
+    "profile": "flash-next-tp4-32k",
+    "hcGemv": 0,
+    "pcieIpc": 1,
+    "qsaCublasIndexer": 0
+  }
 }

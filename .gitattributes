@@ -33,3 +33,8 @@ ultra/source/benchlocal-native/packs/** -text
 *.lock text eol=lf
 **/LICENSE text eol=lf
 ultra/source/benchlocal-native/packs/** -text
+
+# Preserve the byte-pinned TP4 runtime and PCIe-IPC backport.
+docker/next/tp4/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+*.go text eol=lf
+ultra/source/benchlocal-verifiers/LICENSE-Moby-profiles text eol=lf

@@ -385,6 +385,8 @@ class Qwen4ExpModel(nn.Module):
 
     def __init__(self, *, vllm_config: VllmConfig, prefix: str = "") -> None:
         super().__init__()
+        from sm75_next_tp4 import install as install_tp4_adapter
+        install_tp4_adapter(vllm_config)
         config: Qwen4ExpTextConfig = vllm_config.model_config.hf_text_config
         self.config = config
         self.num_redundant_experts = (

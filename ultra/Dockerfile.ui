@@ -12,7 +12,7 @@ LABEL org.opencontainers.image.title="VLLM-SM75 Ultra" \
       io.sm75.ui.entry="unified-workbench" \
       io.sm75.release.channel="beta"
 ENV NCCL_P2P_LEVEL=SYS
-RUN test -f /opt/sm75-workbench/benchlocal-verifiers/runtime-lock.json && test -f /opt/sm75-workbench/benchlocal-native/catalog.json
+RUN test -x /opt/sm75-workbench/benchlocal-verifiers/host-broker && test -f /opt/sm75-workbench/benchlocal-native/catalog.json
 RUN node -e 'const fs=require("fs"); if(process.version!=="v22.23.2" || JSON.parse(fs.readFileSync("/opt/harness/node_modules/@deepseek-ai/dsh/package.json")).version!=="0.1.7-alpha.2") throw Error("Use the audited beta2 single-image Ultra runtime");'
 COPY source/console /tmp/sm75-console
 RUN rm -rf /opt/sm75-workbench/console \

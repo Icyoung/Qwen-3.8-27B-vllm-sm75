@@ -1,0 +1,15 @@
+# syntax=docker/dockerfile:1
+# Preparation for a complete, layer-folded Ultra. No runtime dependency is removed.
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE} AS prepared
+# Preparation is CPU-only; the OCI packer restores the donor runtime environment.
+ENV NVIDIA_VISIBLE_DEVICES=void CUDA_VISIBLE_DEVICES=-1
+ARG SOURCE_REVISION=local-preserve
+ARG RELEASE_VERSION=0.1.7-ultra-beta2-preserve-test
+COPY . /opt/sm75-preserve-source
+RUN python3 /opt/sm75-preserve-source/tools/install_ultra_release.py /opt/sm75-preserve-source \
+    && rm -rf /opt/sm75-preserve-source
+LABEL org.opencontainers.image.version="${RELEASE_VERSION}" \
+      org.opencontainers.image.revision="${SOURCE_REVISION}" \
+      io.sm75.next.tp4="preserved-20261010" \
+      io.sm75.benchlocal.execution="ondemand-v1"

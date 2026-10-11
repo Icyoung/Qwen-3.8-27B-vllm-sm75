@@ -1,0 +1,126 @@
+{
+  "schema": 1,
+  "source_image": "sha256:99cbdb70dec724a5af47951b5acc3827427d8781a13a87718ea8aab89afd174a",
+  "flashinfer_version": "0.6.18",
+  "pcie_ipc_source": {
+    "version": "0.7.0.post1",
+    "wheel_sha256": "c7adf826568d61fc1b7d3aadd4cae387a35a138bfc08e2deca2f34ecfa280716"
+  },
+  "runtime_files": {
+    "runtime/cache_policy.py": {
+      "sha256": "44c1b40fb8e47a2971ea572fb4ed2402fa4487689a657db68d494463d911f577",
+      "origin": "99cbdb70dec7:/opt/next-runtime/cache_policy.py"
+    },
+    "runtime/fast_route.py": {
+      "sha256": "0e3a6688f42ba31ed2b81f79f3c35619b0f7d7887401915a526eb23698fb161b",
+      "origin": "99cbdb70dec7:/opt/next-runtime/fast_route.py"
+    },
+    "runtime/frequency_slots.py": {
+      "sha256": "74f8af2600db27869a99e4485d687e7665aba35ed9c974f4e5da06f0356fa89e",
+      "origin": "99cbdb70dec7:/opt/next-runtime/frequency_slots.py"
+    },
+    "runtime/graph_boundary.py": {
+      "sha256": "1bdb9ced0cdb221bf02ecf21521658a763963495fbef059eab2dfe5dde816ad6",
+      "origin": "99cbdb70dec7:/opt/next-runtime/graph_boundary.py"
+    },
+    "runtime/perf_control.py": {
+      "sha256": "22d467b2a04a9d42cc2af6ed9a683e7a0f3d19978763d33c6af92d955ffea33e",
+      "origin": "99cbdb70dec7:/opt/next-runtime/perf_control.py"
+    },
+    "runtime/ple_paged_reader.py": {
+      "sha256": "b5a3347d7d4c7c3476b29405ff7aa3f6f7c42b55646eb0a9c1d84dac4fef4e0e",
+      "origin": "99cbdb70dec7:/opt/next-runtime/ple_paged_reader.py"
+    },
+    "runtime/ple_runtime.py": {
+      "sha256": "632d441930a8729b8316eb294496d3b9df537f134b25edac2f49a2757e85b180",
+      "origin": "99cbdb70dec7:/opt/next-runtime/ple_runtime.py"
+    },
+    "runtime/route_observe.py": {
+      "sha256": "927f47f894026dd1c5a39c9817b875f7e3afdcdba8181c82f6560917fb10306f",
+      "origin": "99cbdb70dec7:/opt/next-runtime/route_observe.py"
+    },
+    "runtime/text_cache_compat.py": {
+      "sha256": "2e9e4a99d2915d9f26aa5fe530f2fceac16370500abb67d54b7c11affa005bf7",
+      "origin": "99cbdb70dec7:/opt/next-runtime/text_cache_compat.py"
+    },
+    "runtime/tp4_bounded.py": {
+      "sha256": "a799f7a3b254023ca5c5d8d47e2d5fbe0b690f9b726cc5752c9c22544a5c8da2",
+      "origin": "99cbdb70dec7:/opt/next-runtime/tp4_bounded.py"
+    },
+    "runtime/tp4_expert_slots.py": {
+      "sha256": "cd2a1199c31fbbc77de7eb9df9c3e9e40790199e249e045daf41a98f8734f786",
+      "origin": "99cbdb70dec7:/opt/next-runtime/tp4_expert_slots.py"
+    },
+    "runtime/tp4_routed_hotcache.py": {
+      "sha256": "4ed2986ea9a706114c85e80f7fa1ae1b65313b17766496096c581dd7b882ee2c",
+      "origin": "99cbdb70dec7:/opt/next-runtime/tp4_routed_hotcache.py"
+    },
+    "runtime/wide_expert_cache.py": {
+      "sha256": "e5e3c9019d0a067e0eaaec3496d3eca366e7907badaf8fc345ef50f65a2d6fd2",
+      "origin": "99cbdb70dec7:/opt/next-runtime/wide_expert_cache.py"
+    },
+    "sm75_next_tp4.py": {
+      "sha256": "043950657c7acff190d4da7c2052fcb57a2dc894ac336ae219e2385cf2539279",
+      "origin": "scoped-loader-20261010"
+    }
+  },
+  "flashinfer_files": {
+    "comm/pcie_ipc_ar.py": {
+      "kind": "add",
+      "sha256": "b8d8c8d53396880e1fe7db82f598467e5b6e4807d675bfcb99b1cd63ce612e16",
+      "bytes": 44053
+    },
+    "comm/pcie_ipc_policy.py": {
+      "kind": "add",
+      "sha256": "d03c82bbca75a9d8df28f0aba5c863a8f9332c6faa22175a73d8b2f28678f3bb",
+      "bytes": 7253
+    },
+    "comm/pcie_ipc_topology.py": {
+      "kind": "add",
+      "sha256": "26f473a1acdce258f1b8ca4240f6c4c028554b257d4b16a5c44902505546edb2",
+      "bytes": 8265
+    },
+    "comm/pcie_ipc_tuning.py": {
+      "kind": "add",
+      "sha256": "d20d088fc287bb36a865d66e682dc696c2196d54be3e6dddad64ae4765133df8",
+      "bytes": 20829
+    },
+    "data/csrc/pcie_ipc_all_reduce.cu": {
+      "kind": "add",
+      "sha256": "b2646bcef5e3e11dc9a5243cd7cd750cf75d54a8c199457f01fdcc56e28d817a",
+      "bytes": 9694
+    },
+    "data/include/flashinfer/comm/pcie_ipc_all_reduce.cuh": {
+      "kind": "add",
+      "sha256": "f03a372c53c20c3176cddd0f90db6242222a01ebebcbc83af96b169c37bf57a1",
+      "bytes": 98049
+    },
+    "jit/comm.py": {
+      "kind": "append",
+      "sha256": "d15e6194da7ee7eeddaf2955707031e836d47e659b76b2520ef573112b151e4b",
+      "bytes": 10243,
+      "base_sha256": "4625dec38d1298224d96e391c62bb11c1427476a2481b3d7a34da3f3a7689845",
+      "base_bytes": 9794,
+      "append_sha256": "08985c7a8e86f7af318373425ddea29ecbbbab801634acc2e6f1aad854a9ddea",
+      "append_bytes": 449
+    },
+    "trace/templates/comm.py": {
+      "kind": "append",
+      "sha256": "4030121452f5fea38da5da4fbb5af56416aedb5c31a17cccd6c5e3150921f795",
+      "bytes": 12067,
+      "base_sha256": "97364d610dc4b99404c89d136f4ec8dc79358207c7b36ba307ac0cdc07661a29",
+      "base_bytes": 9792,
+      "append_sha256": "2cf7cb981b4284cf14dd7dfe5e97578250861c45b75705edbcbbb4d55c7346ef",
+      "append_bytes": 2275
+    },
+    "comm/__init__.py": {
+      "kind": "append",
+      "sha256": "e2dcd5ab1246ef74e3b5cf06c281492f6dafddb230db7f75782ba86fbed1698e",
+      "bytes": 5971,
+      "base_sha256": "32efee18c548c00821c5a5aafad1756185c11d46a3b680949362993a2512dfe2",
+      "base_bytes": 5160,
+      "append_sha256": "f616d6cfe1cdd6b1cf746f2d1d5d0458e7f80c1ae7b6697fc3aced417929e42c",
+      "append_bytes": 811
+    }
+  }
+}

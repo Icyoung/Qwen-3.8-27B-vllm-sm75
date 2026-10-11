@@ -17,6 +17,7 @@ LABEL org.opencontainers.image.version="${RELEASE_VERSION}" \
       org.opencontainers.image.source="https://github.com/fishensw/VLLM-SM75" \
       org.opencontainers.image.title="VLLM-SM75 Ultra" \
       io.sm75.benchlocal.unified="1" \
+      io.sm75.benchlocal.execution="ondemand-v1" \
       io.sm75.source-commit="${SOURCE_REVISION}" \
       ai.vllm.sm75.modes="base,mtp,dflash2,dspark" \
       io.sm75.source-sha256="${SOURCE_SHA256}"
