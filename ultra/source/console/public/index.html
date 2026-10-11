@@ -7,7 +7,7 @@
   ><link rel="icon" href="/brand/favicon.svg" /><link
     rel="manifest"
     href="/brand/manifest.webmanifest"
-  /><script src="/appearance-bootstrap.js"></script><link rel="stylesheet" href="/style.css?v=benchlocal-aligned-20261010" />
+  /><script src="/appearance-bootstrap.js"></script><link rel="stylesheet" href="/style.css?v=benchlocal-selection-20261012" />
   <body>
     <aside id="consoleSidebar" hidden>
       <h2 class="brand">
@@ -740,7 +740,7 @@
                   <label>Seed<input data-bl-param="seed" type="number" min="-2147483648" max="2147483647" step="1" placeholder="跟随题包" /></label>
                   <label>方案名称<input id="blPresetName" maxlength="100" placeholder="例如：中思考 · 温度0.6" /></label>
                 </div><div class="benchlocal-actions"><button id="blSavePreset">保存参数方案</button><span id="blParameterNote" class="muted">参数只用于本次评测。</span></div></details>
-                <div class="benchlocal-actions"><button id="blSelectSix">默认6项</button><button id="blSelectAll">全部9项</button><button id="blSelectNone">清空</button><span id="blSelectionCount" class="muted"></span><button id="blRun" class="primary">开始评测</button><button id="blStop" disabled>停止</button></div>
+                <div class="benchlocal-actions"><button id="blSelectSix" class="bl-selection-preset" type="button">默认6项</button><button id="blSelectAll" class="bl-selection-preset" type="button">全部9项</button><button id="blSelectNone" class="bl-selection-preset" type="button">清空</button><span id="blSelectionCount" class="muted"></span><button id="blRun" class="primary">开始评测</button><button id="blStop" disabled>停止</button></div>
                 <div id="blCategories" class="bl-categories" aria-label="全部九类能力测试"></div>
                 <p id="blStatus" role="status"></p>
                 <div class="benchlocal-history"><label>测试记录<select id="blHistory"><option value="">暂无记录</option></select></label><label>对照一<select id="blCompare"><option value="">不作对照</option></select></label><label>对照二<select id="blCompareTwo"><option value="">不作对照</option></select></label></div>
@@ -952,6 +952,6 @@
         <pre id="logs"></pre>
       </dialog>
     </main>
-    <script type="module" src="/app.js?v=benchlocal-aligned-20261010"></script>
+    <script type="module" src="/app.js?v=benchlocal-selection-20261012"></script>
   </body>
 </html>
