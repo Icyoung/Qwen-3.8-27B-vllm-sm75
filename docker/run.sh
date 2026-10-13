@@ -162,6 +162,7 @@ extra+=(--safetensors-load-strategy lazy --model-loader-extra-config '{"enable_m
 resources=(--memory "${CONTAINER_MEMORY:-6g}" --memory-swap "${CONTAINER_MEMORY:-6g}")
 
 docker run --detach --name "${CONTAINER_NAME:-vllm-sm75-$VARIANT-$FORMAT}" \
+  --label "io.qwen-sm75.launch-fingerprint=${QWEN_SM75_LAUNCH_FINGERPRINT:-manual}" \
   --gpus "${GPUS:-all}" --shm-size "${SHM_SIZE:-512m}" "${resources[@]}" --ulimit nofile=1048576:1048576 \
   --publish "${PORT:-8000}:8000" "${mounts[@]}" \
   --env "VLLM_USE_MODELSCOPE=$use_modelscope" --env MODELSCOPE_CACHE=/root/.cache/modelscope/hub \

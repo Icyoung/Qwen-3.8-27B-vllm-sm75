@@ -38,3 +38,9 @@ MODEL_ROOT=/srv/models MODEL=/models/Qwen3.8-27B-FP8 bash docker/run.sh
 ```
 
 NUC9 的 Thunderbolt/PEX 拓扑未完成 P2P payload 资格验证，不能沿用 Z4 的结论。32K、6GiB 启动预算和 FP8 checkpoint 的全模型数值质量都需后续 GPU 验收。这轮按用户要求只改源码。
+
+## 一键入口
+
+`bash start.sh` 使用上述环境变量，额外支持 `QWEN_SM75_CONFIG_DIR`（API key 的私有目录）。`VLLM_API_KEY` 优先于自动生成的 key；默认生成文件权限 600。默认容器名 `qwen38-27b-sm75`，入口会保存配置指纹作为容器 label，重复执行可复用相同运行容器，配置不同或已停止时保留现场并报错。
+
+附加原生参数可用 `bash start.sh -- --enforce-eager`。API key、host/port、served model 和 TP 通过环境变量配置，禁止用附加参数覆盖，以保证就绪检查和配置匹配正确。默认等待模型列表，未做生成验收。`--dry-run` 不读取/生成凭据或访问 Docker/GPU。源码构建的主机资源预算独立于推理容器的 6GiB 限额；NUC9 应复用外部构建的完整镜像。

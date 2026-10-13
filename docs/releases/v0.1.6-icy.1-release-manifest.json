@@ -32,6 +32,12 @@
     "shellConfigurationCasesPassed": 7,
     "sourceAndLinks": "passed",
     "runtimeCompilationConfig": "requires complete vLLM installation; not run",
-    "gpu": "not run"
+    "gpu": "not run",
+    "oneClickCpuTestsPassed": 14
+  },
+  "oneClick": {
+    "entry": "../../start.sh",
+    "realStartupValidated": false,
+    "hostPackagesAutoInstalled": false
   }
 }

@@ -19,3 +19,9 @@ The default is official `Qwen/Qwen3.8-27B-FP8` from ModelScope. Missing files do
 Default communication uses NCCL with FP16 reductions and automatic topology selection. FP8 Firefly communication is opt-in; all ranks must agree on P2P availability. Its default chunk buffer is 16MiB, and changed chunking may change FP8 rounding. P2P capability does not establish payload correctness or speed.
 
 See [configuration](docs/configuration-icy.md), [build](docker/BUILD.md), [review](docs/optimization-review.md), and [source validation](docs/releases/v0.1.6-icy.1.md). [中文说明](README.md).
+
+## One-command entry
+
+On a Linux x86_64 host with Docker, NVIDIA drivers and NVIDIA Container Toolkit, run `bash start.sh`. It checks the SM75 devices/runtime, creates or reuses an owner-only API key, reuses a full image or builds one if missing, starts the ModelScope FP8 API, and waits for the authenticated model listing. It does not perform generation. `bash start.sh --dry-run` has no credential, Docker, download or GPU side effects.
+
+NUC9 currently lacks Docker and should import a full image built elsewhere. Source builds require 8GiB available RAM and 200GiB free disk; no host packages/drivers are automatically installed. Existing conflicting/stopped containers are preserved. This entry has only been validated with a mocked runtime, not real GPU startup.

@@ -4,6 +4,22 @@
 
 **当前是源代码候选：本 fork 未构建镜像、启动模型或测量 P2P/吞吐。** 上游历史报告保留在 `docs/validation` 和旧版本发布说明，不能作为此 fork 的验收结果。版本 `0.1.6-icy.1`；[改动与验证](docs/releases/v0.1.6-icy.1.md)。
 
+## 一键启动
+
+在已安装 Docker、NVIDIA 驱动和 Container Toolkit 的 Linux x86_64 主机上：
+
+```bash
+bash start.sh
+# 只查看计划，不访问 Docker/GPU，不生成 key 或下载模型：
+bash start.sh --dry-run
+```
+
+入口检查 SM75 GPU 和 Docker NVIDIA runtime；自动生成并复用私有 API key，复用已有完整镜像，镜像缺失时按资源门槛构建；随后自动下载缺失的 ModelScope FP8 权重并等待认证后的模型列表可用。它不执行生成请求。默认容器名 `qwen38-27b-sm75`，API 地址 `http://127.0.0.1:8000/v1`。key 位于 `$HOME/.config/qwen-3.8-27b-vllm-sm75/api-key`，权限 600，不在输出中打印；已有 `VLLM_API_KEY` 则优先使用。
+
+NUC9 当前未安装 Docker，不能在现状下直接运行。其 8GB RAM 不满足此入口的源码构建门槛（8GiB 可用 RAM、200GiB 可用空间）；应在其他机器构建并导入完整镜像后复用。脚本不自动安装驱动/Toolkit，也不停止或替换已有不同配置的容器。
+
+`--no-wait` 只提交启动，不能表示就绪；`--wait-timeout 3600` 指定下载/加载阶段等待秒数。重复执行复用配置相同的运行容器；旧容器已停止或配置不同会报错并保留它。`--rebuild` 仅在无同名容器时构建。高级环境配置见[配置说明](docs/configuration-icy.md)。本轮仅做模拟检查，没有实际构建或启动。
+
 ## 构建和默认模型
 
 需要 Linux x86_64、Docker/BuildKit；运行需要 NVIDIA 驱动和 Container Toolkit。构建使用固定摘要的官方 vLLM 0.30.0 / CUDA 12.9 基座及 SM75 扩展，默认单任务。完整构建建议使用独立构建机，NUC9 的 8GB RAM 不代表已经验证可构建或加载。
