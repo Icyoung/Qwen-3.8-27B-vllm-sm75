@@ -21,7 +21,7 @@ import os
 
 # Internal release fingerprint, not an environment setting. Bump when overlay
 # changes can select a different kernel or packed-weight layout before tracing.
-_COMPILE_REVISION = "0.1.6-1"
+_COMPILE_REVISION = "0.1.6-icy.1"
 
 # 需从 compile_factors hash 中排除的 key: idle auto-sleep 计时器/路径只影响
 # 调度与 checkpoint bookkeeping, 不改变编译图。切 test/prod sleep 计时不应
@@ -46,15 +46,15 @@ def _firefly_mode() -> str:
 
 
 def _firefly_ar_mode() -> str:
-    """VLLM_FIREFLY_AR 归一化: 'auto'(默认, 跟随 VLLM_FIREFLY) / '0'=强制关 /
+    """VLLM_FIREFLY_AR 归一化: 'auto'(显式跟随 VLLM_FIREFLY) / '0'=默认关 /
     'fp8'=强制开。
 
-    auto = firefly 模式开 (VLLM_FIREFLY=1) 时 fp8 allreduce 自动启用 (fp8 近乎
-    无损, PLAN-fp8-allreduce §3.5); firefly 关 → AR 关。'fp8' 单独开 (firefly
+    auto = firefly 模式开 (VLLM_FIREFLY=1) 时 fp8 allreduce 自动启用。FP8
+    reduction 有损，需单独验收；firefly 关 → AR 关。'fp8' 单独开 (firefly
     不用也开 AR); '0' 单独关 (firefly 开但 AR 不用)。FireflyAllReduce 只做 fp8,
     双 backend (P2P / SHM, 见 VLLM_FIREFLY_AR_BACKEND)。
     """
-    v = os.getenv("VLLM_FIREFLY_AR", "").strip().lower()
+    v = os.getenv("VLLM_FIREFLY_AR", "0").strip().lower()
     if v in ("0", "off", "false", "no"):
         return "0"
     if v in ("fp8", "1", "on", "true", "yes"):
@@ -64,7 +64,7 @@ def _firefly_ar_mode() -> str:
 
 def _firefly_ar_backend() -> str:
     """VLLM_FIREFLY_AR_BACKEND 归一化: 'auto'(默认, 运行时按 _can_p2p 选 P2P
-    优先) / 'p2p'(强制 P2P) / 'shm'(强制 SHM)。
+    优先) / 'p2p'(需整组一致通过检查) / 'shm'(强制 SHM)。
 
     auto = 有 P2P (NVLink/PCIe 直连) 选 P2P (data/flag 全 device 显存, 无 host
     bounce); 无 P2P (PHB, 如 T10) 回 SHM (/dev/shm + cudaHostRegister)。
@@ -124,6 +124,9 @@ EXTENSIONS: dict[str, object] = {
     # 走 NCCL; prefill M>=256 (2MB) 起走 firefly。见 firefly_allreduce.py。
     "VLLM_FIREFLY_AR_MIN_SIZE": lambda: int(
         os.environ.get("VLLM_FIREFLY_AR_MIN_SIZE", "1048576")
+    ),
+    "VLLM_FIREFLY_AR_CHUNK_BYTES": lambda: int(
+        os.environ.get("VLLM_FIREFLY_AR_CHUNK_BYTES", "16777216")
     ),
     # FireflyAllReduce 传输 backend: auto(默认, 运行时 _can_p2p 选 P2P 优先) /
     # p2p(强制) / shm(强制)。P2P 有 NVLink/PCIe 直连时 data/flag 全 device 显存

@@ -4,8 +4,8 @@
 #   - 前台运行 vllm serve；容器停止时先让监督器恢复 16 再退出。
 set -euo pipefail
 
-# Keep the tested SM75 TP communication default; explicit overrides win.
-export NCCL_P2P_LEVEL="${NCCL_P2P_LEVEL-SYS}"
+# NCCL's default distance policy is selected from topology; explicit settings
+# supplied by the launcher remain in the environment.
 
 PSTATE_PID=""
 if command -v pstate-supervisor.sh >/dev/null 2>&1; then

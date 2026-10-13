@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "release": "0.1.6-icy.1",
+  "status": "source-only-unqualified",
+  "published": false,
+  "productionReplacement": false,
+  "upstreamRepository": "https://github.com/fishensw/VLLM-SM75",
+  "upstreamCommit": "ecee5c70ee4e8cbd915edc49340d07fa5f5545ad",
+  "edition": "standard",
+  "defaultModel": {
+    "provider": "modelscope",
+    "id": "Qwen/Qwen3.8-27B-FP8",
+    "quantization": "fp8",
+    "weightBlockSize": [
+      128,
+      128
+    ]
+  },
+  "gpuValidation": {
+    "imagesBuilt": false,
+    "inferenceRun": false,
+    "p2pMeasured": false
+  },
+  "documentation": {
+    "main": "../../README.md",
+    "configurationTemplates": "../configuration-icy.md",
+    "build": "../../docker/BUILD.md"
+  },
+  "validation": {
+    "cpuTestsPassed": 54,
+    "cpuSubtestsPassed": 5,
+    "shellConfigurationCasesPassed": 7,
+    "sourceAndLinks": "passed",
+    "runtimeCompilationConfig": "requires complete vLLM installation; not run",
+    "gpu": "not run"
+  }
+}

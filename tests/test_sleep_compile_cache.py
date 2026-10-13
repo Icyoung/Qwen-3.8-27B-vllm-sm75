@@ -119,7 +119,7 @@ class SleepCompileCacheTests(unittest.TestCase):
             legacy["VLLM_MONITOR"] = False
             for name in _load_envs_sm75().INSTALL_IGNORED:
                 legacy.pop(name, None)
-            legacy["_vllm_sm75_compile_revision"] = "0.1.6-1"
+            legacy["_vllm_sm75_compile_revision"] = "0.1.6-icy.1"
             self.assertEqual(legacy, self.envs.compile_factors())
             self.assertTrue(self.envs.environment_variables["VLLM_MONITOR"]())
 
@@ -130,7 +130,7 @@ class SleepCompileCacheTests(unittest.TestCase):
         for name in self.envs_sm75.INSTALL_IGNORED:
             legacy.pop(name, None)
         legacy["VLLM_MONITOR"] = False
-        self.assertEqual(current["_vllm_sm75_compile_revision"], "0.1.6-1")
+        self.assertEqual(current["_vllm_sm75_compile_revision"], "0.1.6-icy.1")
         without_revision = {
             key: value for key, value in current.items()
             if key != "_vllm_sm75_compile_revision"
@@ -147,6 +147,16 @@ class SleepCompileCacheTests(unittest.TestCase):
             "_vllm_sm75_compile_revision", self.envs.environment_variables
         )
 
+    def test_old_upstream_revision_and_buffer_changes_invalidate_cache(self):
+        self.envs_sm75.apply()
+        current = self.envs.compile_factors()
+        upstream = dict(current, _vllm_sm75_compile_revision="0.1.6-1")
+        self.assertNotEqual(current, upstream)
+        self.assertNotEqual(
+            self.cache_key(VLLM_FIREFLY_AR_CHUNK_BYTES="16777216"),
+            self.cache_key(VLLM_FIREFLY_AR_CHUNK_BYTES="134217728"),
+        )
+
     def test_revision_is_fixed_and_repeated_apply_is_idempotent(self):
         # Restore the complete extension registry narrowed by setUp before
         # checking real repeated-install behavior.
@@ -160,7 +170,7 @@ class SleepCompileCacheTests(unittest.TestCase):
             self.assertEqual(reference, self.cache_key())
             self.assertEqual(
                 self.envs.compile_factors()["_vllm_sm75_compile_revision"],
-                "0.1.6-1",
+                "0.1.6-icy.1",
             )
 
 

@@ -16,8 +16,6 @@ __pycache__/
 
 # Local validation artifacts and private runtime state
 /evidence/
-/ultra/source/console/data/
-/ultra/node_modules/
 
 # Generated dependencies and local test caches
 node_modules/

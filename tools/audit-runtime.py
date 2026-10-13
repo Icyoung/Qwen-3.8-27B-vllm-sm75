@@ -39,7 +39,7 @@ def expected(repo):
         add(source, source.relative_to(repo / "docker/speculative").as_posix(), 2, "speculative-overlay")
     standard = dict(records)
     return {"sourceCommit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip(),
-            "standard": list(standard.values()), "ultra": list(records.values())}
+            "standard": list(standard.values())}
 
 
 def inspect_runtime():
@@ -76,7 +76,7 @@ def main():
     compare = sub.add_parser("compare")
     compare.add_argument("expected", type=Path)
     compare.add_argument("actual", type=Path)
-    compare.add_argument("--variant", choices=("standard", "ultra"), required=True)
+    compare.add_argument("--variant", choices=("standard",), required=True)
     compare.add_argument("--image-id", required=True)
     compare.add_argument("--csv", type=Path, required=True)
     args = parser.parse_args()

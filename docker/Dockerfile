@@ -47,7 +47,6 @@ RUN python3 /opt/flashqla-build/source/build_extension.py \
         sort -u)" = "sm_75"
 
 FROM sm75-base AS runtime
-ENV NCCL_P2P_LEVEL=SYS
 
 # Match the reviewed startup fixes rather than resolving a moving latest release.
 RUN uv pip install --system transformers==5.15.1
@@ -119,6 +118,8 @@ COPY vllm/distributed/device_communicators/firefly_allreduce.cu \
     /tmp/sm75-overlay/distributed/device_communicators/firefly_allreduce.cu
 COPY vllm/distributed/device_communicators/cuda_communicator.py \
     /tmp/sm75-overlay/distributed/device_communicators/cuda_communicator.py
+COPY vllm/distributed/device_communicators/custom_all_reduce.py \
+    /tmp/sm75-overlay/distributed/device_communicators/custom_all_reduce.py
 COPY vllm/v1/engine/auto_sleep.py \
     /tmp/sm75-overlay/v1/engine/auto_sleep.py
 COPY vllm/v1/engine/core.py \
@@ -166,6 +167,7 @@ ENV FLASH_QLA_SM75_PREBUILT_EXTENSION_PATH=/opt/vllm-sm75/extensions/flash_qla_s
     PYTHONWARNINGS=ignore::FutureWarning \
     TRANSFORMERS_VERBOSITY=error \
     VLLM_FIREFLY=auto \
+    VLLM_FIREFLY_AR=0 \
     VLLM_USE_MODELSCOPE=true \
     MODELSCOPE_CACHE=/root/.cache/modelscope/hub
 

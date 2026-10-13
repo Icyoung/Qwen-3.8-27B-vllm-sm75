@@ -20,10 +20,9 @@ env:
 
 # 单次 AR 的数据槽容量 (fp16 字节)。所有消息都走 firefly (无 max-size NCCL 回退);
 # 超过此容量的消息按 CHUNK 字节分块循环 (buffer 固定不随消息增长, 内存恒定)。
-# 128MB = 覆盖 27B(hidden=5120) 8192-token chunk 的 84MB fp16 allreduce, 大块
-# 一次走完不分块; 更大 (如更长 prompt / 更大 hidden) 自动分块, 数值等价 (fp8
-# 是按 chunk 独立 amax/scale, 逐块求和与整体一致 —— allreduce 无跨块耦合)。
-_CHUNK_BYTES = 128 * 1024 * 1024
+# Default 16 MiB fits the small-host prefill chunks. Larger messages split;
+# each chunk has its own FP8 scale, so changing this size can change rounding.
+_CHUNK_BYTES = 16 * 1024 * 1024
 
 import ctypes
 import logging
@@ -150,12 +149,21 @@ class FireflyAllReduce:
         if not firefly_ar_world_ok(world_size) or not firefly_ar_active():
             return
         self._mod = _load_cuda_mod()
-        if self._mod is None:
+        module_available = self._mod is not None
+        if self._group is not None:
+            import torch.distributed as dist
+
+            vote = torch.tensor([int(module_available)], dtype=torch.int32, device="cpu")
+            dist.all_reduce(vote, op=dist.ReduceOp.MIN, group=self._group)
+            module_available = bool(vote.item())
+        if not module_available:
             return
 
         # data_half (fp8 bytes) = chunk / 2 (fp16 2B/elem -> fp8 1B/elem)。
         # buffer 固定为 _CHUNK_BYTES, 不随消息增长; 超 chunk 的消息分块循环。
-        self._chunk = _CHUNK_BYTES
+        self._chunk = envs.VLLM_FIREFLY_AR_CHUNK_BYTES
+        if not 1024 * 1024 <= self._chunk <= 128 * 1024 * 1024 or self._chunk % 4096:
+            raise ValueError("VLLM_FIREFLY_AR_CHUNK_BYTES must be 1-128 MiB and a multiple of 4096")
         self._data_half = self._chunk // 2
         self._ptrs = None
 
@@ -192,24 +200,37 @@ class FireflyAllReduce:
         )
 
     def _select_backend(self, rank_in_group: int) -> str:
-        """P2P 优先 (有 P2P 无 host bounce), 否则 SHM。VLLM_FIREFLY_AR_BACKEND
-        可强制 p2p/shm; auto(默认) 运行时按 _can_p2p 选。"""
+        """Use P2P only if every rank can reach every other rank.
+
+        A rank-local decision is unsafe on partially connected topologies:
+        ranks would enter different IPC/SHM collectives and could deadlock.
+        Explicit p2p still requires the complete group capability check.
+        """
         pref = envs.VLLM_FIREFLY_AR_BACKEND
-        if pref == "p2p":
-            return "p2p"
+        if pref not in {"auto", "shm", "p2p"}:
+            raise ValueError("VLLM_FIREFLY_AR_BACKEND must be auto, shm, or p2p")
         if pref == "shm":
             return "shm"
-        # auto: 有 P2P 选 P2P (group 缺失无法交换 IPC handle, 回 SHM)
         if self._group is None:
             return "shm"
+        supported = False
         try:
             from vllm.distributed.device_communicators.custom_all_reduce import (
                 _can_p2p,
             )
-            return "p2p" if _can_p2p(rank_in_group, self.world_size) else "shm"
-        except Exception as e:  # noqa: BLE001 - P2P 检测失败回 SHM
+            supported = _can_p2p(rank_in_group, self.world_size)
+        except Exception as e:  # noqa: BLE001 - every rank must still vote
             logger.debug("firefly ar P2P check failed, use SHM: %s", e)
-            return "shm"
+        import torch.distributed as dist
+
+        vote = torch.tensor([int(supported)], dtype=torch.int32, device="cpu")
+        # self._group is the communicator's Gloo CPU group, not NCCL.
+        # Collective errors propagate rather than choosing different fallbacks.
+        dist.all_reduce(vote, op=dist.ReduceOp.MIN, group=self._group)
+        available = bool(vote.item())
+        if not available and pref == "p2p":
+            logger.warning("Requested Firefly P2P is unavailable for the complete group; using SHM")
+        return "p2p" if available else "shm"
 
     def _init_p2p(self, total: int) -> bool:
         """P2P backend: IPC buffer 交换拿 own/peer 显存指针 (data/flag 全 device,
@@ -242,24 +263,7 @@ class FireflyAllReduce:
             return False
 
     def _select_backend_n(self, rank_in_group: int) -> str:
-        """N 卡 (>=4) butterfly 后端: VLLM_FIREFLY_AR_BACKEND 优先, auto 按
-        _can_p2p 选 (无 P2P 如 T10 PCIe → SHM, 有 P2P → p2p)。"""
-        pref = envs.VLLM_FIREFLY_AR_BACKEND
-        if pref == "p2p":
-            return "p2p"
-        if pref == "shm":
-            return "shm"
-        # auto: 有 P2P 选 P2P (group 缺失无法交换 IPC handle, 回 SHM)
-        if self._group is None:
-            return "shm"
-        try:
-            from vllm.distributed.device_communicators.custom_all_reduce import (
-                _can_p2p,
-            )
-            return "p2p" if _can_p2p(rank_in_group, self.world_size) else "shm"
-        except Exception as e:  # noqa: BLE001 - P2P 检测失败回 SHM
-            logger.debug("firefly ar N-GPU P2P check failed, use SHM: %s", e)
-            return "shm"
+        return self._select_backend(rank_in_group)
 
     def _init_p2p_butterfly(self) -> bool:
         """N 卡 (4/8) butterfly: 单 IPC buffer (N*data_half + 24 + 16N 字节,

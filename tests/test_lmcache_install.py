@@ -5,7 +5,7 @@ import json
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-MODULE = ROOT / "ultra/source/lmcache/install.py"
+MODULE = ROOT / "extensions/lmcache/install.py"
 spec = importlib.util.spec_from_file_location("sm75_lmcache_install", MODULE)
 installer = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(installer)
@@ -105,7 +105,7 @@ def test_atomic_replace_failure_keeps_original_and_cleans_temporary(monkeypatch,
 
 
 def test_startup_probe_rejects_stock_or_unknown_module_before_cuda_import(monkeypatch, tmp_path):
-    probe_path = ROOT / "ultra/source/console/lmcache_probe.py"
+    probe_path = ROOT / "extensions/lmcache/probe.py"
     probe_spec = importlib.util.spec_from_file_location("sm75_lmcache_probe", probe_path)
     probe = importlib.util.module_from_spec(probe_spec)
     probe_spec.loader.exec_module(probe)

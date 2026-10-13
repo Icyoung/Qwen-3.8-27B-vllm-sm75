@@ -2,13 +2,14 @@
 set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 case "${EDITION:-standard}" in
-  ultra) exec bash "$SCRIPT_DIR/helpers/run-ultra.sh" "$@" ;;
   standard) ;;
-  *) echo 'EDITION must be standard or ultra' >&2; exit 2 ;;
+  *) echo 'This fork only provides EDITION=standard' >&2; exit 2 ;;
 esac
 : "${VLLM_API_KEY:?Set VLLM_API_KEY to your own API key}"
 VARIANT="${VARIANT:-base}"
 FORMAT="${FORMAT:-fp8}"
+TP_SIZE="${TP_SIZE:-4}"
+[[ "$TP_SIZE" =~ ^(1|2|4|8)$ ]] || { echo 'TP_SIZE must be 1, 2, 4, or 8' >&2; exit 2; }
 case "$VARIANT" in base|mtp|dflash2) ;; *) echo 'VARIANT must be base, mtp, or dflash2' >&2; exit 2;; esac
 case "$FORMAT" in fp8|awq) ;; *) echo 'FORMAT must be fp8 or awq' >&2; exit 2;; esac
 if [[ "$FORMAT" == awq ]]; then
@@ -17,14 +18,14 @@ else
   MODEL="${MODEL:-Qwen/Qwen3.8-27B-FP8}"
 fi
 SERVE_NAME="${SERVED_MODEL_NAME:-VLLM-Qwen3.8-27B}"
-CACHE_ROOT="${VLLM_SM75_CACHE_ROOT:?Set VLLM_SM75_CACHE_ROOT to an absolute host cache directory}"
+CACHE_ROOT="${VLLM_SM75_CACHE_ROOT:-$HOME/.cache/vllm-sm75}"
 [[ "$CACHE_ROOT" == /* ]] || { echo 'Cache path must be absolute' >&2; exit 2; }
 MODEL_CACHE_ROOT="${VLLM_SM75_MODEL_CACHE_ROOT:-$CACHE_ROOT/models}"
 [[ "$MODEL_CACHE_ROOT" == /* ]] || { echo 'Model cache path must be absolute' >&2; exit 2; }
-mkdir -p "$MODEL_CACHE_ROOT" "$CACHE_ROOT/$FORMAT/vllm" "$CACHE_ROOT/shared/flashinfer" \
+mkdir -p "$MODEL_CACHE_ROOT/modelscope" "$MODEL_CACHE_ROOT/huggingface" "$CACHE_ROOT/$FORMAT/vllm" "$CACHE_ROOT/shared/flashinfer" \
   "$CACHE_ROOT/$FORMAT/triton" "$CACHE_ROOT/shared/torch_extensions"
-mounts=(--volume "$MODEL_CACHE_ROOT:/root/.cache/modelscope"
-  --volume "$MODEL_CACHE_ROOT:/root/.cache/huggingface"
+mounts=(--volume "$MODEL_CACHE_ROOT/modelscope:/root/.cache/modelscope"
+  --volume "$MODEL_CACHE_ROOT/huggingface:/root/.cache/huggingface"
   --volume "$CACHE_ROOT/$FORMAT/vllm:/root/.cache/vllm"
   --volume "$CACHE_ROOT/shared/flashinfer:/root/.cache/flashinfer"
   --volume "$CACHE_ROOT/$FORMAT/triton:/root/.triton/cache"
@@ -33,14 +34,14 @@ if [[ -n "${MODEL_ROOT:-}" ]]; then
   [[ "$MODEL_ROOT" == /* && -d "$MODEL_ROOT" ]] || { echo 'MODEL_ROOT must be an existing absolute directory' >&2; exit 2; }
   mounts+=(--volume "$MODEL_ROOT:/models:ro")
 fi
-seq=4; batch=8192; util=0.87; length=auto; kv=0
+seq=1; batch=512; util=0.87; length=32768; kv=0
 [[ "$FORMAT" != awq ]] || { seq=8; batch=16384; }
 VERSION="$(tr -d ' \r\n' < "$SCRIPT_DIR/VERSION")"
 image="vllm-sm75:v${VERSION}"
 image="${IMAGE:-$image}"
 graph='{"cudagraph_mode":"FULL_AND_PIECEWISE"}'
 extra=()
-POWER_MODE="${POWER_MODE:-pstate}"
+POWER_MODE="${POWER_MODE:-sleep}"
 case "$POWER_MODE" in sleep|pstate) ;; *) echo 'POWER_MODE must be sleep or pstate' >&2; exit 2;; esac
 entrypoint=()
 pstate_env=()
@@ -96,6 +97,7 @@ if [[ "$VARIANT" == mtp ]]; then
   extra+=(--speculative-config '{"method":"mtp","num_speculative_tokens":5}' --scheduler-cls "$SCHED_CLS")
   graph='{"cudagraph_mode":"FULL_AND_PIECEWISE","cudagraph_capture_sizes":[6]}'
 elif [[ "$VARIANT" == dflash2 ]]; then
+  [[ "$TP_SIZE" == 4 ]] || { echo 'This DFlash2 template requires TP_SIZE=4' >&2; exit 2; }
   : "${DRAFT_MODEL:?Set DRAFT_MODEL to the matching DFlash draft directory under /models}"
   [[ "$DRAFT_MODEL" == /models/* && -n "${MODEL_ROOT:-}" ]] || { echo 'Mount MODEL_ROOT and set DRAFT_MODEL=/models/your-draft' >&2; exit 2; }
   [[ "$DRAFT_MODEL" != *'"'* && "$DRAFT_MODEL" != *'\'* ]] || exit 2
@@ -106,7 +108,7 @@ elif [[ "$VARIANT" == dflash2 ]]; then
 fi
 
 # Public tuning knobs use engine-native units. Zero CPU KV disables offload.
-CPU_KV_GIB="${CPU_KV_GIB:-8}"
+CPU_KV_GIB="${CPU_KV_GIB:-0}"
 [[ "$CPU_KV_GIB" =~ ^(0|[1-9][0-9]{0,5})$ ]] || { echo 'CPU_KV_GIB must be a non-negative integer' >&2; exit 2; }
 kv="${GPU_KV_BYTES:-${kv:-0}}"
 [[ "$kv" =~ ^(0|[1-9][0-9]*)$ ]] || { echo 'GPU_KV_BYTES must be a non-negative integer' >&2; exit 2; }
@@ -118,23 +120,65 @@ fi
 hf_overrides="${HF_OVERRIDES:-}"
 [[ -n "$hf_overrides" ]] || hf_overrides='{"dtype":"float16"}'
 
+# FP8 checkpoints and FP8 communication are independent choices. The default
+# NCCL path retains FP16 reductions; Firefly's lossy reductions are opt-in.
+COMM_BACKEND="${COMM_BACKEND:-nccl}"
+case "$COMM_BACKEND" in
+  nccl) ar_default=0 ;;
+  firefly|auto) ar_default=auto ;;
+  *) echo 'COMM_BACKEND must be nccl, firefly, or auto' >&2; exit 2 ;;
+esac
+P2P_MODE="${P2P_MODE:-auto}"
+case "$P2P_MODE" in
+  auto) p2p_default=0 ;;
+  off) p2p_default=1 ;;
+  on) p2p_default=0 ;;
+  *) echo 'P2P_MODE must be auto, off, or on' >&2; exit 2 ;;
+esac
+p2p_disable="${NCCL_P2P_DISABLE:-$p2p_default}"
+[[ "$p2p_disable" == 0 || "$p2p_disable" == 1 ]] || { echo 'NCCL_P2P_DISABLE must be 0 or 1' >&2; exit 2; }
+[[ "$P2P_MODE" != off || "$p2p_disable" == 1 ]] || { echo 'P2P_MODE=off conflicts with NCCL_P2P_DISABLE=0' >&2; exit 2; }
+ar_backend="${VLLM_FIREFLY_AR_BACKEND:-auto}"
+case "$ar_backend" in auto|shm|p2p) ;; *) echo 'VLLM_FIREFLY_AR_BACKEND must be auto, shm, or p2p' >&2; exit 2;; esac
+if [[ "$p2p_disable" == 1 ]]; then
+  [[ "$ar_backend" != p2p ]] || { echo 'Disabled P2P conflicts with the Firefly p2p backend' >&2; exit 2; }
+  ar_backend=shm
+fi
+comm_env=(--env "NCCL_P2P_DISABLE=$p2p_disable" --env "NCCL_IB_DISABLE=${NCCL_IB_DISABLE:-1}")
+# Leave the distance policy unset unless requested: NCCL decides from the
+# actual topology, rather than assuming a Thunderbolt bridge supports SYS.
+if [[ -n "${NCCL_P2P_LEVEL:-}" ]]; then
+  case "$NCCL_P2P_LEVEL" in LOC|NVL|PIX|PXB|PHB|SYS) ;; *) echo 'Invalid NCCL_P2P_LEVEL' >&2; exit 2;; esac
+  comm_env+=(--env "NCCL_P2P_LEVEL=$NCCL_P2P_LEVEL")
+fi
+MODEL_PROVIDER="${MODEL_PROVIDER:-modelscope}"
+case "$MODEL_PROVIDER" in
+  modelscope) use_modelscope=true ;;
+  huggingface) use_modelscope=false ;;
+  *) echo 'MODEL_PROVIDER must be modelscope or huggingface' >&2; exit 2 ;;
+esac
+[[ -z "${MODEL_REVISION:-}" ]] || extra+=(--revision "$MODEL_REVISION")
+extra+=(--safetensors-load-strategy lazy --model-loader-extra-config '{"enable_multithread_load":false}')
+resources=(--memory "${CONTAINER_MEMORY:-6g}" --memory-swap "${CONTAINER_MEMORY:-6g}")
+
 docker run --detach --name "${CONTAINER_NAME:-vllm-sm75-$VARIANT-$FORMAT}" \
-  --gpus all --shm-size 16g --ulimit nofile=1048576:1048576 \
+  --gpus "${GPUS:-all}" --shm-size "${SHM_SIZE:-512m}" "${resources[@]}" --ulimit nofile=1048576:1048576 \
   --publish "${PORT:-8000}:8000" "${mounts[@]}" \
-  --env VLLM_USE_MODELSCOPE=true --env MODELSCOPE_CACHE=/root/.cache/modelscope/hub \
+  --env "VLLM_USE_MODELSCOPE=$use_modelscope" --env MODELSCOPE_CACHE=/root/.cache/modelscope/hub \
   --env VLLM_GDN_DECODE_KERNEL=triton --env VLLM_USE_FLASHINFER_SAMPLER=0 \
   --env VLLM_MARLIN_USE_ATOMIC_ADD="${VLLM_MARLIN_USE_ATOMIC_ADD:-0}" \
-  --env NCCL_P2P_LEVEL="${NCCL_P2P_LEVEL-SYS}" \
+  "${comm_env[@]}" \
   --env VLLM_USE_NCCL_SYMM_MEM=0 --env VLLM_ALLREDUCE_USE_SYMM_MEM=0 \
   --env TRITON_CACHE_DIR=/root/.triton/cache --env TORCH_EXTENSIONS_DIR=/root/.cache/torch_extensions \
   --env VLLM_ALLREDUCE_USE_FLASHINFER="${VLLM_ALLREDUCE_USE_FLASHINFER:-0}" \
-  --env VLLM_FIREFLY="${VLLM_FIREFLY:-1}" --env VLLM_FIREFLY_AR="${VLLM_FIREFLY_AR:-auto}" \
-  --env VLLM_FIREFLY_AR_BACKEND="${VLLM_FIREFLY_AR_BACKEND:-auto}" \
+  --env VLLM_FIREFLY="${VLLM_FIREFLY:-1}" --env VLLM_FIREFLY_AR="${VLLM_FIREFLY_AR:-$ar_default}" \
+  --env VLLM_FIREFLY_AR_BACKEND="$ar_backend" \
   --env VLLM_FIREFLY_AR_MIN_SIZE="${VLLM_FIREFLY_AR_MIN_SIZE:-1048576}" \
+  --env VLLM_FIREFLY_AR_CHUNK_BYTES="${VLLM_FIREFLY_AR_CHUNK_BYTES:-16777216}" \
   --env OMP_NUM_THREADS=2 --env MAX_JOBS=1 --env NVCC_THREADS="${NVCC_THREADS:-1}" --env TORCHINDUCTOR_COMPILE_THREADS=1 \
-  "${pstate_env[@]}" "${entrypoint[@]}" "$image" "$MODEL" --served-model-name "$SERVE_NAME" \
+  ${pstate_env[@]+"${pstate_env[@]}"} ${entrypoint[@]+"${entrypoint[@]}"} "$image" "$MODEL" --served-model-name "$SERVE_NAME" \
   --host 0.0.0.0 --port 8000 --api-key "$VLLM_API_KEY" \
-  --tensor-parallel-size 4 --disable-custom-all-reduce \
+  --tensor-parallel-size "${TP_SIZE:-4}" --disable-custom-all-reduce \
   --max-num-seqs "${MAX_NUM_SEQS:-$seq}" --max-num-batched-tokens "${MAX_NUM_BATCHED_TOKENS:-$batch}" \
   --gpu-memory-utilization "${GPU_MEMORY_UTILIZATION:-$util}" --max-model-len "${MAX_MODEL_LEN:-$length}" \
   --attention-config '{"backend":"FLASHINFER"}' --gdn-prefill-backend flashqla_sm75 \

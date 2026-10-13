@@ -13,7 +13,7 @@ def check(root=ROOT):
     files = subprocess.check_output(['git', 'ls-files', '-z'], cwd=root).decode().split('\0')
     files = [name for name in files if name and (root / name).is_file()]
     for name in files:
-        if name.startswith(('evidence/', 'ultra/source/console/data/', '.env')):
+        if name.startswith(('evidence/', '.env')):
             errors.append('Private runtime artifact tracked: ' + name)
         if re.search(r'^docker/(?:Dockerfile.*v0\.|BUILD-v)', name):
             errors.append('Versioned build recipe: ' + name)
@@ -31,7 +31,7 @@ def check(root=ROOT):
     manifest = json.loads((root / f'docs/releases/v{version}-release-manifest.json').read_text())
     if version != manifest['release']:
         errors.append('VERSION and release manifest disagree')
-    for name in ['README.md', 'README.en.md', 'docker/BUILD.md', 'ultra/README.md', f'docs/releases/v{version}.md']:
+    for name in ['README.md', 'README.en.md', 'docker/BUILD.md', f'docs/releases/v{version}.md']:
         if not (root / name).is_file():
             errors.append('Missing current guide: ' + name)
     return {'version': version, 'trackedFilesChecked': len(files), 'errors': errors,

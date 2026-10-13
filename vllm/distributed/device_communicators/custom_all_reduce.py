@@ -94,11 +94,12 @@ def _can_p2p(rank: int, world_size: int) -> bool:
             logger.debug("Skipping P2P check and trusting the driver's P2P report.")
             # can_device_access_peer takes visible device ordinals, while
             # rank and i are logical local IDs.
-            return torch.cuda.can_device_access_peer(
+            if not torch.cuda.can_device_access_peer(
                 current_platform.logical_device_id_to_visible_device_id(rank),
                 current_platform.logical_device_id_to_visible_device_id(i),
-            )
-        if not gpu_p2p_access_check(rank, i):
+            ):
+                return False
+        elif not gpu_p2p_access_check(rank, i):
             return False
     return True
 

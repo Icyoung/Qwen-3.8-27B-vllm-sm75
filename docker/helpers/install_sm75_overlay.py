@@ -50,6 +50,7 @@ def main() -> None:
         "distributed/device_communicators/firefly_allreduce.py",
         "distributed/device_communicators/firefly_allreduce.cu",
         "distributed/device_communicators/cuda_communicator.py",
+        "distributed/device_communicators/custom_all_reduce.py",
         "v1/attention/backends/flashinfer.py",
         "v1/attention/backends/gdn_attn.py",
         "v1/core/sched/scheduler_sm75.py",
