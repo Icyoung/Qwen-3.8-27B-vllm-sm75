@@ -1,12 +1,12 @@
-# VLLM-SM75 · Icy standard fork
+# Qwen-3.8-27B-vllm-sm75
 
 A standard-only SM75 inference fork based on [fishensw/VLLM-SM75](https://github.com/fishensw/VLLM-SM75/tree/ecee5c70ee4e8cbd915edc49340d07fa5f5545ad). Ultra, Harness, and Node/npm build inputs have been removed. OpenAI serving, GDN, FP8/AWQ, FP8 KV, speculation, monitoring, and engine exit sleep remain. Licenses are preserved.
 
 This is a **source-only, GPU-unqualified candidate**. No images, inference, or P2P benchmarks have been run for this fork. Historical upstream reports are not validation of these changes.
 
 ```bash
-git clone https://github.com/Icyoung/VLLM-SM75.git
-cd VLLM-SM75
+git clone https://github.com/Icyoung/Qwen-3.8-27B-vllm-sm75.git
+cd Qwen-3.8-27B-vllm-sm75
 MAX_JOBS=1 bash docker/build.sh
 # Optional download only; no GPUs or inference process.
 bash docker/download.sh

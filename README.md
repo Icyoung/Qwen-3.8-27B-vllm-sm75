@@ -1,4 +1,4 @@
-# VLLM-SM75 · Icy standard fork
+# Qwen-3.8-27B-vllm-sm75
 
 面向四张 Tesla T10 16GiB / SM75 的推理 infra。基于 [fishensw/VLLM-SM75](https://github.com/fishensw/VLLM-SM75/tree/ecee5c70ee4e8cbd915edc49340d07fa5f5545ad)，保留 OpenAI API、SM75 GDN、FP8/AWQ、FP8 KV、MTP/DFlash2、自动休眠和引擎监控。仅提供标准版，已移除 Ultra 控制台、Harness、Node/npm 依赖及对应构建/启动入口。Apache-2.0 和第三方许可证保留。
 
@@ -9,8 +9,8 @@
 需要 Linux x86_64、Docker/BuildKit；运行需要 NVIDIA 驱动和 Container Toolkit。构建使用固定摘要的官方 vLLM 0.30.0 / CUDA 12.9 基座及 SM75 扩展，默认单任务。完整构建建议使用独立构建机，NUC9 的 8GB RAM 不代表已经验证可构建或加载。
 
 ```bash
-git clone https://github.com/Icyoung/VLLM-SM75.git
-cd VLLM-SM75
+git clone https://github.com/Icyoung/Qwen-3.8-27B-vllm-sm75.git
+cd Qwen-3.8-27B-vllm-sm75
 MAX_JOBS=1 bash docker/build.sh
 
 # 可选：只从 ModelScope 下载，不使用 GPU，也不启动模型。
