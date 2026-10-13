@@ -28,5 +28,7 @@ def install(source, package, evidence):
 
 if __name__ == '__main__':
     import vllm
-    install(Path('/opt/vllm-sm75/speculative'), Path(vllm.__file__).resolve().parent,
-            Path('/opt/vllm-sm75/evidence/speculative-files.json'))
+    import os
+    root = Path(os.environ.get("QWEN_SM75_HOME", str(Path.home() / ".local/share/qwen-3.8-27b-vllm-sm75")))
+    install(Path(__file__).resolve().parents[1] / 'speculative', Path(vllm.__file__).resolve().parent,
+            root / 'evidence/speculative-files.json')

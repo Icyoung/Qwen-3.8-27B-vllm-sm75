@@ -119,7 +119,7 @@ class SleepCompileCacheTests(unittest.TestCase):
             legacy["VLLM_MONITOR"] = False
             for name in _load_envs_sm75().INSTALL_IGNORED:
                 legacy.pop(name, None)
-            legacy["_vllm_sm75_compile_revision"] = "0.1.6-icy.1"
+            legacy["_vllm_sm75_compile_revision"] = "0.1.6-icy.2"
             self.assertEqual(legacy, self.envs.compile_factors())
             self.assertTrue(self.envs.environment_variables["VLLM_MONITOR"]())
 
@@ -130,7 +130,7 @@ class SleepCompileCacheTests(unittest.TestCase):
         for name in self.envs_sm75.INSTALL_IGNORED:
             legacy.pop(name, None)
         legacy["VLLM_MONITOR"] = False
-        self.assertEqual(current["_vllm_sm75_compile_revision"], "0.1.6-icy.1")
+        self.assertEqual(current["_vllm_sm75_compile_revision"], "0.1.6-icy.2")
         without_revision = {
             key: value for key, value in current.items()
             if key != "_vllm_sm75_compile_revision"
@@ -170,7 +170,7 @@ class SleepCompileCacheTests(unittest.TestCase):
             self.assertEqual(reference, self.cache_key())
             self.assertEqual(
                 self.envs.compile_factors()["_vllm_sm75_compile_revision"],
-                "0.1.6-icy.1",
+                "0.1.6-icy.2",
             )
 
 

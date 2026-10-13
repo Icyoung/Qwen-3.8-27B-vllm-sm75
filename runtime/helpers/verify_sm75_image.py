@@ -8,6 +8,7 @@ import importlib.metadata
 import json
 import tempfile
 from pathlib import Path
+import os
 
 import torch
 
@@ -92,7 +93,7 @@ def main() -> None:
     # imports pull in the whole engine stack (executor, model executor,
     # attention backends) and add several GiB of peak memory to the build,
     # on top of the parallel nvcc stage.
-    engine_source = Path("/opt/vllm-sm75/source/vllm/v1/engine")
+    engine_source = Path(os.environ.get("QWEN_SM75_HOME", str(Path.home() / ".local/share/qwen-3.8-27b-vllm-sm75"))) / "source/vllm/v1/engine"
 
     def _class_members(path: Path) -> dict[str, set[str]]:
         tree = ast.parse(path.read_text(), filename=str(path))
@@ -137,7 +138,7 @@ def main() -> None:
         "torch_cuda": torch.version.cuda,
         "target_compute_capability": "7.5",
     }
-    output = Path("/opt/vllm-sm75/evidence/runtime-contract.json")
+    output = Path(os.environ.get("QWEN_SM75_HOME", str(Path.home() / ".local/share/qwen-3.8-27b-vllm-sm75"))) / "evidence/runtime-contract.json"
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
 

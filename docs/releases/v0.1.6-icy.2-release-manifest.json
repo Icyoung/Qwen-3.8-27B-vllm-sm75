@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "release": "0.1.6-icy.2",
+  "status": "native-source-only-unqualified",
+  "deployment": "native-owned-venv",
+  "requiresDocker": false,
+  "upstreamRepository": "https://github.com/fishensw/VLLM-SM75",
+  "upstreamCommit": "ecee5c70ee4e8cbd915edc49340d07fa5f5545ad",
+  "defaultModel": {
+    "provider": "modelscope",
+    "id": "Qwen/Qwen3.8-27B-FP8"
+  },
+  "nativeLock": "../../runtime/native-lock.json",
+  "validation": {
+    "realInstall": false,
+    "gpuInference": false,
+    "p2pMeasured": false,
+    "cpuTestsPassed": 57,
+    "cpuSubtestsPassed": 9,
+    "sourceChecks": "passed"
+  }
+}

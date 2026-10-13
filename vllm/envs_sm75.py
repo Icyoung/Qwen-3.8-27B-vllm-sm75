@@ -21,7 +21,7 @@ import os
 
 # Internal release fingerprint, not an environment setting. Bump when overlay
 # changes can select a different kernel or packed-weight layout before tracing.
-_COMPILE_REVISION = "0.1.6-icy.1"
+_COMPILE_REVISION = "0.1.6-icy.2"
 
 # 需从 compile_factors hash 中排除的 key: idle auto-sleep 计时器/路径只影响
 # 调度与 checkpoint bookkeeping, 不改变编译图。切 test/prod sleep 计时不应

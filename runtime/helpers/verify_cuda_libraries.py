@@ -5,6 +5,7 @@ import hashlib
 import importlib.metadata as metadata
 import json
 from pathlib import Path
+import os
 
 PACKAGES = {
     "nvidia-cudnn-cu12": "9.20.0.48",
@@ -57,7 +58,7 @@ def main():
         raise RuntimeError("Torch CUDA 12.9 ABI was not restored")
     if torch.backends.cudnn.version() != 92000:
         raise RuntimeError("Loaded cuDNN is not the pinned CUDA 12 build")
-    output = Path("/opt/vllm-sm75/evidence/cuda-libraries.json")
+    output = Path(os.environ.get("QWEN_SM75_HOME", str(Path.home() / ".local/share/qwen-3.8-27b-vllm-sm75"))) / "evidence/cuda-libraries.json"
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(evidence, indent=2) + "\n")
     print("CUDA 12 shared-library RECORD hashes verified")

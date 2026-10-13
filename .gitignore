@@ -20,3 +20,5 @@ __pycache__/
 # Generated dependencies and local test caches
 node_modules/
 .pytest_cache/
+
+.native/

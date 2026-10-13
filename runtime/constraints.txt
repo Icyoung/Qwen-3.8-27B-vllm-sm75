@@ -1,0 +1,11 @@
+torch==2.13.0+cu129
+triton==3.7.1
+transformers==5.15.1
+flashinfer-python==0.6.18
+flashinfer-cubin==0.6.18
+cuda-python==12.9.7
+cuda-bindings==12.9.7
+nvidia-cudnn-cu12==9.20.0.48
+nvidia-cusparselt-cu12==0.8.1
+nvidia-nccl-cu12==2.30.7
+nvidia-nvshmem-cu12==3.4.5

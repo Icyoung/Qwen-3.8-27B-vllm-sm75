@@ -21,7 +21,7 @@ def test_wrong_version_leaves_package_untouched(tmp_path, monkeypatch, version):
     monkeypatch.setitem(sys.modules, "vllm", module)
     monkeypatch.setattr(importlib.metadata, "version", lambda name: version)
     monkeypatch.setattr(sys, "argv", ["install_sm75_overlay.py", str(ROOT / "vllm")])
-    main = runpy.run_path(str(ROOT / "docker/helpers/install_sm75_overlay.py"))["main"]
+    main = runpy.run_path(str(ROOT / "runtime/helpers/install_sm75_overlay.py"))["main"]
     with pytest.raises(RuntimeError, match="require vLLM 0.30.0"):
         main()
     assert list(package.iterdir()) == [marker]

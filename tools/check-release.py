@@ -27,11 +27,11 @@ def check(root=ROOT):
             path = unquote(target.split('#')[0].split('?')[0])
             if path and not ((root / name).parent / path).exists():
                 errors.append(f'{name}: missing link {target}')
-    version = (root / 'docker/VERSION').read_text().strip()
+    version = (root / 'runtime/VERSION').read_text().strip()
     manifest = json.loads((root / f'docs/releases/v{version}-release-manifest.json').read_text())
     if version != manifest['release']:
         errors.append('VERSION and release manifest disagree')
-    for name in ['README.md', 'README.en.md', 'docker/BUILD.md', f'docs/releases/v{version}.md']:
+    for name in ['README.md', 'README.en.md', 'docs/native-deployment.md', f'docs/releases/v{version}.md']:
         if not (root / name).is_file():
             errors.append('Missing current guide: ' + name)
     return {'version': version, 'trackedFilesChecked': len(files), 'errors': errors,

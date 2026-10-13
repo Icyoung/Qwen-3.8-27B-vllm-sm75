@@ -16,7 +16,7 @@ import numpy as np
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-MODELS = ROOT / "docker/speculative/vllm/model_executor/models"
+MODELS = ROOT / "runtime/speculative/vllm/model_executor/models"
 
 
 class _Tensor:

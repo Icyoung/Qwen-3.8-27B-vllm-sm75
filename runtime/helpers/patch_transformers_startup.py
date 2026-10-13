@@ -6,11 +6,14 @@ from __future__ import annotations
 import importlib.metadata
 from pathlib import Path
 
-PACKAGE_ROOT = Path("/usr/local/lib/python3.12/dist-packages/transformers")
+import importlib.util
+PACKAGE_ROOT = Path(importlib.util.find_spec("transformers").origin).parent
 
 
 def replace_once(path: Path, old: str, new: str) -> None:
     source = path.read_text()
+    if source.count(old) == 0 and source.count(new) == 1:
+        return
     if source.count(old) != 1:
         raise RuntimeError(f"Expected exactly one match in {path}: {old!r}")
     path.write_text(source.replace(old, new))

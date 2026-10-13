@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-SOURCE = Path(__file__).resolve().parents[2] / "docker/speculative/vllm/v1/worker/gpu/model_runner.py"
+SOURCE = Path(__file__).resolve().parents[2] / "runtime/speculative/vllm/v1/worker/gpu/model_runner.py"
 tree = ast.parse(SOURCE.read_text(encoding="utf-8"))
 function = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "_dflash_warmup_batch_size")
 namespace = {}

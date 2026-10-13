@@ -1,0 +1,21 @@
+{
+  "python": "3.12",
+  "uv": "0.13.0",
+  "vllm_wheel": {
+    "url": "https://github.com/vllm-project/vllm/releases/download/v0.30.0/vllm-0.30.0%2Bcu129-cp38-abi3-manylinux_2_28_x86_64.whl",
+    "sha256": "e98cb69659bfcfc849cf11ce0781a7161d40b02b51a6c3636924a5909f2aabcc"
+  },
+  "cuda_specs": [
+    "cuda-nvcc=12.9.86",
+    "cuda-cudart-dev=12.9.79",
+    "cuda-driver-dev=12.9.79",
+    "cuda-cccl=12.9.27",
+    "gcc_linux-64=13",
+    "gxx_linux-64=13"
+  ],
+  "status": "native source-only; no install or GPU validation",
+  "micromamba": {
+    "url": "https://api.anaconda.org/download/conda-forge/micromamba/2.3.3/linux-64/micromamba-2.3.3-0.tar.bz2",
+    "sha256": "e7274528ceb9c20d048a428d6c22d7e02e268f8ffb762c4c365422347c8b8ba2"
+  }
+}

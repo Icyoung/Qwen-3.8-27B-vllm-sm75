@@ -8,7 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 import unittest
 
-verify = runpy.run_path(str(Path(__file__).resolve().parents[1] / "docker/helpers/verify_cuda_libraries.py"))["verify_distribution_libraries"]
+verify = runpy.run_path(str(Path(__file__).resolve().parents[1] / "runtime/helpers/verify_cuda_libraries.py"))["verify_distribution_libraries"]
 
 
 class CUDALibraryRecordTests(unittest.TestCase):

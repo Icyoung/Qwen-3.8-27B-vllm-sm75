@@ -20,7 +20,7 @@ def digest(path):
 
 
 def expected(repo):
-    tree = ast.parse((repo / "docker/helpers/install_sm75_overlay.py").read_text(encoding="utf-8"))
+    tree = ast.parse((repo / "runtime/helpers/install_sm75_overlay.py").read_text(encoding="utf-8"))
     files = next(ast.literal_eval(n.value) for n in ast.walk(tree)
                  if isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "files" for t in n.targets))
     records = {}
@@ -35,8 +35,8 @@ def expected(repo):
     for source in sorted((repo / "vllm/third_party/flash_qla_sm75").rglob("*")):
         if source.is_file() and "__pycache__" not in source.parts and source.suffix != ".pyc":
             add(source, source.relative_to(repo).as_posix(), 1, "flashqla-vendored-source")
-    for source in sorted((repo / "docker/speculative").rglob("*.py")):
-        add(source, source.relative_to(repo / "docker/speculative").as_posix(), 2, "speculative-overlay")
+    for source in sorted((repo / "runtime/speculative").rglob("*.py")):
+        add(source, source.relative_to(repo / "runtime/speculative").as_posix(), 2, "speculative-overlay")
     standard = dict(records)
     return {"sourceCommit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip(),
             "standard": list(standard.values())}
